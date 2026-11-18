@@ -2,6 +2,14 @@
 
 Three clickable design directions for the native Android companion to Setu. A device owner can prepare the device, see who is requesting remote access, manage an ongoing session, and share screenshots or recordings with a developer.
 
+## Narrated walkthrough
+
+Watch **Field on Android and Relay on desktop** in a 7:05 walkthrough. Follow both sides from email signup and phone readiness through pairing, ADB attachment, backgrounding, evidence sharing, and corporate audit. The video uses prototype screens and simulated sessions.
+
+https://github.com/user-attachments/assets/92c42a6c-374a-443c-98e2-ba494b75ef8b
+
+[Chapters and transcript](docs/walkthrough/TRANSCRIPT.md) · [English captions](docs/walkthrough/setu-walkthrough.en.vtt) · [Download MP4](docs/walkthrough/setu-walkthrough.mp4)
+
 ## Open the prototype
 
 Open `index.html` in a browser. The review panel shows all three design options and a scenario selector on a desktop-sized viewport. On a phone-sized viewport, open the three-dot **Prototype options** menu for the same controls. The prototype uses fictional data and runs locally without a build step.

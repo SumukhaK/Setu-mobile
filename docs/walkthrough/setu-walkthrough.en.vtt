@@ -1,0 +1,414 @@
+WEBVTT
+
+00:00:00.230 --> 00:00:04.859
+This is the Setu walkthrough. Morgan is the
+developer on Relay desktop.
+
+00:00:04.859 --> 00:00:09.488
+Casey hosts a Pixel on Field for Android.
+These two prototypes replay
+
+00:00:09.488 --> 00:00:12.960
+the same story with sample data and
+simulated connections.
+
+00:00:13.830 --> 00:00:17.876
+Start with Create account on each app and
+enter an email address.
+
+00:00:17.876 --> 00:00:21.584
+Returning users choose Sign in and follow
+the same verification flow.
+
+00:00:22.430 --> 00:00:26.670
+Enter the six digit email code. If a code
+expires or does
+
+00:00:26.670 --> 00:00:30.911
+not match, edit the address or request a
+new code after the
+
+00:00:30.911 --> 00:00:34.444
+cooldown. This code signs you in. Device
+pairing comes later.
+
+00:00:35.330 --> 00:00:39.999
+Both apps offer Solo and Corporate. For
+this personal session, choose Solo.
+
+00:00:39.999 --> 00:00:44.667
+Corporate will use organization enrollment
+and a device grant, which we will
+
+00:00:44.667 --> 00:00:45.834
+walk through later.
+
+00:00:46.730 --> 00:00:51.330
+Field gives Casey one next step. Open All
+setup checks to see
+
+00:00:51.330 --> 00:00:55.930
+Wi-Fi, Developer options, and Wireless
+debugging. USB debugging is available for
+wired
+
+00:00:55.930 --> 00:00:58.229
+workflows and can stay off here.
+
+00:00:59.030 --> 00:01:03.207
+Open About phone and tap Build number seven
+times. On some phones,
+
+00:01:03.207 --> 00:01:07.383
+it is under Software information. The guide
+shows what to search for
+
+00:01:07.383 --> 00:01:09.819
+if your Settings menu is arranged
+differently.
+
+00:01:10.630 --> 00:01:14.626
+After the seventh tap, return to Setu and
+run the readiness check
+
+00:01:14.626 --> 00:01:18.622
+again. Android may ask you to confirm the
+phone screen lock during
+
+00:01:18.622 --> 00:01:18.954
+setup.
+
+00:01:19.830 --> 00:01:24.776
+On a supported Android phone, join Wi-Fi,
+go to Developer options, and
+
+00:01:24.776 --> 00:01:29.722
+turn on Wireless debugging. Confirm the
+network if Android asks. Android debugger
+
+00:01:29.722 --> 00:01:33.020
+authorization is a separate prompt from
+Setu pairing.
+
+00:01:33.830 --> 00:01:38.295
+The required checks passed. Casey taps
+Start hosting and reads the Setu
+
+00:01:38.295 --> 00:01:42.761
+pairing code to Morgan. It expires, and
+Casey can renew it. The
+
+00:01:42.761 --> 00:01:46.110
+phone is now ready to receive an access
+request.
+
+00:01:46.930 --> 00:01:50.655
+In Relay, choose Connect device and enter
+the code from the phone.
+
+00:01:50.655 --> 00:01:54.380
+An expired code keeps you in the form and
+explains how to
+
+00:01:54.380 --> 00:01:57.484
+recover. Ask Casey to renew or read the
+current code.
+
+00:01:58.330 --> 00:02:02.549
+Morgan submits the current code and sees
+Awaiting approval. Casey checks the
+
+00:02:02.549 --> 00:02:06.768
+requester and the requested access on
+Android. They can decline the request
+
+00:02:06.768 --> 00:02:08.174
+and still keep hosting.
+
+00:02:09.030 --> 00:02:13.395
+After Casey approves, Setu opens an
+encrypted tunnel and gives Morgan a
+
+00:02:13.395 --> 00:02:17.760
+local endpoint. The ready state means the
+tunnel is listening. The debugger
+
+00:02:17.760 --> 00:02:19.214
+still needs to attach.
+
+00:02:20.030 --> 00:02:24.421
+Run the copied ADB connect command on the
+computer. Then select the
+
+00:02:24.421 --> 00:02:28.812
+phone in Android Studio. If the command is
+unavailable, check Platform Tools.
+
+00:02:28.812 --> 00:02:33.204
+If Android asks you to trust the debugger,
+approve it on the
+
+00:02:33.204 --> 00:02:33.569
+phone.
+
+00:02:34.430 --> 00:02:38.169
+Both screens now show ADB attached. Morgan
+can run or debug the
+
+00:02:38.169 --> 00:02:41.908
+app in the IDE, and Casey can still see who
+is connected
+
+00:02:41.908 --> 00:02:43.154
+and end the session.
+
+00:02:44.030 --> 00:02:48.334
+Move Relay to the tray to continue working
+in the IDE. If
+
+00:02:48.334 --> 00:02:52.638
+Casey leaves Field, Android shows an
+ongoing notification from the foreground
+service.
+
+00:02:52.638 --> 00:02:56.224
+Either person can end the session from the
+background controls.
+
+00:02:57.030 --> 00:03:02.518
+On a network interruption, Setu shows
+Reconnecting. If automatic recovery
+expires, check
+
+00:03:02.518 --> 00:03:08.005
+Wi-Fi and hosting, then retry. An
+unavailable device stays visibly offline
+until
+
+00:03:08.005 --> 00:03:09.834
+the connection is restored.
+
+00:03:10.730 --> 00:03:15.009
+Open Evidence and choose Take screenshot or
+Record screen. Android asks whether
+
+00:03:15.009 --> 00:03:19.288
+to share one app or the entire screen each
+time capture begins.
+
+00:03:19.288 --> 00:03:23.567
+If Casey declines or Android hides
+protected content, choose a permitted
+capture
+
+00:03:23.567 --> 00:03:25.349
+or import an existing file.
+
+00:03:26.230 --> 00:03:29.888
+Review the image and write a short note
+with the action and
+
+00:03:29.888 --> 00:03:33.546
+result. A useful report says what was
+tapped, what happened, and where
+
+00:03:33.546 --> 00:03:36.289
+to look. Keep sensitive content out of the
+capture.
+
+00:03:37.130 --> 00:03:41.292
+Review the file name and note one more
+time, then choose the
+
+00:03:41.292 --> 00:03:45.454
+developer inbox or an allowed Android share
+destination. If sharing fails, the
+
+00:03:45.454 --> 00:03:47.534
+local draft stays available for retry.
+
+00:03:48.430 --> 00:03:53.066
+Record screen follows the same consent
+flow. The recording indicator and Stop
+
+00:03:53.066 --> 00:03:57.702
+recording control stay available. Stop the
+clip, review what it contains, and
+
+00:03:57.702 --> 00:04:00.019
+share it with the same context.
+
+00:04:00.830 --> 00:04:05.346
+Use Import media when the screenshot or
+clip already exists. Android’s picker
+
+00:04:05.346 --> 00:04:09.863
+opens first. The imported item follows the
+same preview, note, and sharing
+
+00:04:09.863 --> 00:04:11.744
+flow as a fresh capture.
+
+00:04:12.630 --> 00:04:17.146
+On desktop, Evidence can import a
+screenshot or recording from the local
+
+00:04:17.146 --> 00:04:21.662
+machine. Open the preview, add the
+reproduction steps, and keep a draft
+
+00:04:21.662 --> 00:04:25.049
+or continue to share. Export saves a local
+copy.
+
+00:04:25.930 --> 00:04:30.376
+Choose the review folder and confirm
+sharing. This walkthrough uses simulated
+destinations.
+
+00:04:30.376 --> 00:04:34.822
+In the product, this is where an authorized
+upload would make the
+
+00:04:34.822 --> 00:04:36.674
+evidence available to the reviewer.
+
+00:04:37.530 --> 00:04:41.480
+The confirmation tells Morgan the evidence
+was shared. Casey can also see
+
+00:04:41.480 --> 00:04:45.430
+the status of their own evidence. The
+evidence file and note stay
+
+00:04:45.430 --> 00:04:47.405
+separate from the session audit log.
+
+00:04:48.230 --> 00:04:52.306
+Morgan opens Disconnect in the current
+session. Casey can also choose End
+
+00:04:52.306 --> 00:04:56.382
+session on the phone or in the
+notification. Ending the session closes
+
+00:04:56.382 --> 00:04:59.100
+the tunnel and releases the local ADB
+endpoint.
+
+00:04:59.930 --> 00:05:04.324
+History records the device and how the
+session ended. Casey can stop
+
+00:05:04.324 --> 00:05:08.717
+hosting separately so the phone stops
+accepting new requests. On desktop, Forget
+
+00:05:08.717 --> 00:05:12.744
+device removes a saved pairing when reuse
+is no longer wanted.
+
+00:05:13.630 --> 00:05:18.013
+On a managed account or phone, Solo can be
+locked by the
+
+00:05:18.013 --> 00:05:22.397
+organization. Both screens explain the
+decision. The real product must enforce it
+
+00:05:22.397 --> 00:05:25.684
+in the session service, Android host, and
+organization gateway.
+
+00:05:26.530 --> 00:05:31.124
+Corporate access requires verified
+membership, device enrollment, and a device
+grant. The
+
+00:05:31.124 --> 00:05:35.719
+phone owner can ask an administrator for
+help when enrollment is pending.
+
+00:05:35.719 --> 00:05:39.164
+An email address by itself grants no device
+access.
+
+00:05:40.030 --> 00:05:44.524
+In Corporate on Relay, choose Select device
+and pick an enrolled phone
+
+00:05:44.524 --> 00:05:49.019
+you’ve been granted. Restricted or offline
+devices show a reason. In a
+
+00:05:49.019 --> 00:05:52.390
+managed deployment, these sessions travel
+through the organization relay.
+
+00:05:53.230 --> 00:05:57.903
+Authorized users open Audit log and export
+the report. The report records
+
+00:05:57.903 --> 00:06:02.577
+session events and may include operation
+details when available. Screenshots and
+recordings
+
+00:06:02.577 --> 00:06:04.134
+are shared from Evidence.
+
+00:06:05.030 --> 00:06:09.878
+If the account lacks membership or its
+device grant, ask the administrator.
+
+00:06:09.878 --> 00:06:14.726
+If Android debugging is blocked by device
+policy, hosting stays unavailable. A
+
+00:06:14.726 --> 00:06:17.150
+revoked grant ends the existing session.
+
+00:06:18.030 --> 00:06:23.036
+When a destination is blocked by corporate
+policy, the draft stays available.
+
+00:06:23.036 --> 00:06:28.043
+Casey can select the approved organization
+inbox. Personal and managed evidence live
+
+00:06:28.043 --> 00:06:29.294
+in separate workspaces.
+
+00:06:30.130 --> 00:06:35.710
+Profile and settings show email and the
+current workspace. Relay exposes the
+
+00:06:35.710 --> 00:06:41.290
+tray preference and local diagnostics.
+Field exposes debugging readiness,
+foreground notifications, and
+
+00:06:41.290 --> 00:06:42.220
+remembered access.
+
+00:06:43.030 --> 00:06:47.202
+You can clear remembered access before
+handing the phone back. To finish,
+
+00:06:47.202 --> 00:06:51.374
+use Sign out. The product should close any
+active session and clear
+
+00:06:51.374 --> 00:06:53.460
+the active credentials when you leave.
+
+00:06:54.330 --> 00:06:59.007
+That completes the Setu walkthrough. The
+repository adds a transcript and chapter
+
+00:06:59.007 --> 00:07:03.685
+times. You can replay the journeys in the
+prototypes using their demo
+
+00:07:03.685 --> 00:07:04.464
+scenario menus.
