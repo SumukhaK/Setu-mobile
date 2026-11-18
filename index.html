@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f6fb">
+  <title>Setu for Android</title>
+  <link rel="stylesheet" href="prototype.css">
+  <script src="prototype.js" defer></script>
+</head>
+<body>
+  <div class="workspace">
+    <aside class="review" aria-labelledby="review-title">
+      <div class="review-product" id="review-product"></div>
+      <h1 id="review-title">Setu for<br>Android.</h1>
+      <p class="review-intro">Three ways to prepare, host, and review a remote debugging session.</p>
+      <div class="review-directions" id="directions" aria-label="Design direction"></div>
+      <div class="review-scenarios">
+        <label for="scenario">Jump to a scenario</label>
+        <select id="scenario">
+          <option value="setup">Device setup</option>
+          <option value="signup">Email onboarding</option>
+          <option value="ready">Ready to host</option>
+          <option value="request">Incoming request</option>
+          <option value="active">Active session</option>
+          <option value="recovery">Connection lost</option>
+          <option value="managed">Managed enrollment</option>
+          <option value="blocked">Debugging restricted</option>
+          <option value="evidence">Evidence review</option>
+        </select>
+      </div>
+      <div id="scenario-actions" class="review-controls"></div>
+      <p class="review-footer">Interactive design preview · Demo data</p>
+    </aside>
+    <div class="device-stage">
+      <div class="device" id="device" data-theme="relay"></div>
+      <p class="device-caption">Pixel 8a <span>·</span> Android prototype</p>
+    </div>
+  </div>
+  <div id="announce" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+</body>
+</html>
