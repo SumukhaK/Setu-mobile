@@ -14,7 +14,7 @@ Updated by the post-merge ritual. Desktop (DT-*) status is tracked in Setu-Deskt
 - [x] AT-02 · Hosting foreground service and notification · Done in [#6](https://github.com/SumukhaK/Setu-mobile/pull/6)
 - [x] AT-03 · Readiness engine · Done in [#8](https://github.com/SumukhaK/Setu-mobile/pull/8)
 - [x] AT-04 · Battery and OEM readiness, MIUI install recovery · Done in [#12](https://github.com/SumukhaK/Setu-mobile/pull/12)
-- [ ] AT-05 · Guided setup UI
+- [x] AT-05 · Guided setup UI · Done in [#15](https://github.com/SumukhaK/Setu-mobile/pull/15)
 - [ ] AT-06 · Solo hosting screen
 - [ ] AT-07 · Connected desktops and End session
 - [ ] AT-08 · Debugger recovery and system pairing guidance
@@ -285,9 +285,9 @@ The repos are still wireframes, so the tickets fix a stack. Change it once, here
 - **SDK binding:** `ConnectionState` (injected `StateFlow`; the live flow from hosting is wired in AT-06, CODEBASE_MEMORY AD-14), `Online.adbdEndpoint`.
 
 ### AT-06 · Solo hosting screen
-- **Files:** `feature/host/HostScreen.kt`, `HostViewModel.kt`.
-- **Tests first:** P03 (the code changes only when the agent emits a new `pairing_code`), P10 hosting part, `Reconnecting(retryInMs = -1)` renders without a countdown.
-- **SDK binding:** `ConnectionState.Online(deviceId, pairingCode, adbdEndpoint, warning, path)`, `pair()`, `stop()`, `Reconnecting`, `GenAdbException.*`.
+- **Files:** `core/setu/.../SetuHost.kt` (+ `pair()`), `SetuManagerHost.kt`; `app/.../service/HostingRegistry.kt` (process-wide live state, fed by `HostingService`); new `:feature:host` module: `HostViewModel.kt`, `HostScreen.kt` (+ stateless `HostContent`); `MainActivity.kt` (Prepare / Host tabs, live state into setup and host); `app/build.gradle.kts` (build-time default relay URL).
+- **Tests first:** P03 (the code shown changes only when the agent emits a new `pairing_code`; `pair()`'s return value is never displayed), P17 (Stop hosting visible while hosting; service destroy returns the UI to Idle), `Reconnecting(retryInMs = -1)` renders without a countdown, Online shows device ID.
+- **SDK binding:** `ConnectionState.Online(deviceId, pairingCode, adbdEndpoint, warning, path)`, `pair()`, `Reconnecting`. Start/stop go through `HostingService` (AD-1).
 
 ### AT-07 · Connected desktops and End session
 - **Files:** `feature/host/SessionsList.kt`, `SessionRow.kt`.

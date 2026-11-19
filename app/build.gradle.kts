@@ -57,7 +57,9 @@ kotlin {
 
 dependencies {
     implementation(project(":core:setu"))
+    implementation(project(":feature:setup"))
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.ui)

@@ -18,3 +18,4 @@ rootProject.name = "setu-mobile"
 include(":app")
 include(":core:readiness")
 include(":core:setu")
+include(":feature:setup")
