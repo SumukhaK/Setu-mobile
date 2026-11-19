@@ -25,6 +25,21 @@ class FakeSetuHost : SetuHost {
     /** When set, [start] throws it after recording the call. */
     var startError: Exception? = null
 
+    /** Scripted result for [pair] (AT-06). */
+    var pairResult: String = "1234-567890"
+
+    /** When set, [pair] throws it after recording the call. */
+    var pairError: Exception? = null
+
+    var pairCount: Int = 0
+        private set
+
+    override suspend fun pair(timeoutMs: Long): String {
+        pairCount++
+        pairError?.let { throw it }
+        return pairResult
+    }
+
     override fun start(config: SetuConfig?) {
         calls += "start"
         starts += config
