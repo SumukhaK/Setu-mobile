@@ -7,14 +7,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReadinessTest {
-    // P04: the Wireless path has the four J2 steps, and SDK evidence beats a NO setting.
+    // P04: the Wireless path has the J2 steps, and SDK evidence beats a NO setting.
     @Test
     fun p04WirelessPathUsesWirelessStepsAndSdkEvidence() {
         val report = readiness(
             path = SetupPath.WirelessDebugging,
-            developerOptions = Tri.YES,
-            wirelessDebugging = Tri.NO,
-            notifications = Tri.YES,
+            checks = checks(wirelessDebugging = Tri.NO),
             state = ConnectionState.Online(deviceId = "dev-1", adbdEndpoint = "192.168.1.5:37001"),
         )
 
@@ -23,6 +21,7 @@ class ReadinessTest {
                 Step.DEVELOPER_OPTIONS,
                 Step.WIRELESS_DEBUGGING,
                 Step.NOTIFICATIONS,
+                Step.BATTERY,
                 Step.AGENT_REACHES_ADBD,
             ),
             report.steps.keys,
@@ -37,9 +36,7 @@ class ReadinessTest {
     fun p04UnreachableAdbdIsNotReady() {
         val report = readiness(
             path = SetupPath.WirelessDebugging,
-            developerOptions = Tri.YES,
-            wirelessDebugging = Tri.YES,
-            notifications = Tri.YES,
+            checks = checks(wirelessDebugging = Tri.YES),
             state = ConnectionState.Online(deviceId = "dev-1", warning = "adbd_unreachable: wireless off"),
         )
 
@@ -52,9 +49,7 @@ class ReadinessTest {
     fun p04UsbPathChecksTheLoopbackEndpoint() {
         val atEndpoint = readiness(
             path = SetupPath.UsbTcpip,
-            developerOptions = Tri.YES,
-            wirelessDebugging = Tri.UNKNOWN,
-            notifications = Tri.YES,
+            checks = checks(),
             state = ConnectionState.Online(deviceId = "dev-1", adbdEndpoint = "127.0.0.1:5555"),
         )
 
@@ -63,6 +58,7 @@ class ReadinessTest {
                 Step.DEVELOPER_OPTIONS,
                 Step.USB_TCPIP_ENDPOINT,
                 Step.NOTIFICATIONS,
+                Step.BATTERY,
                 Step.AGENT_REACHES_ADBD,
             ),
             atEndpoint.steps.keys,
@@ -72,9 +68,7 @@ class ReadinessTest {
 
         val wrongPort = readiness(
             path = SetupPath.UsbTcpip,
-            developerOptions = Tri.YES,
-            wirelessDebugging = Tri.UNKNOWN,
-            notifications = Tri.YES,
+            checks = checks(),
             state = ConnectionState.Online(deviceId = "dev-1", adbdEndpoint = "127.0.0.1:5556"),
         )
 
@@ -87,9 +81,7 @@ class ReadinessTest {
     fun p04UsbEndpointWithUnreachableWarningIsNotReady() {
         val report = readiness(
             path = SetupPath.UsbTcpip,
-            developerOptions = Tri.YES,
-            wirelessDebugging = Tri.UNKNOWN,
-            notifications = Tri.YES,
+            checks = checks(),
             state = ConnectionState.Online(
                 deviceId = "dev-1",
                 adbdEndpoint = "127.0.0.1:5555",
@@ -106,9 +98,7 @@ class ReadinessTest {
     fun p04UsbEndpointWithoutEndpointIsUnknown() {
         val report = readiness(
             path = SetupPath.UsbTcpip,
-            developerOptions = Tri.YES,
-            wirelessDebugging = Tri.UNKNOWN,
-            notifications = Tri.YES,
+            checks = checks(),
             state = ConnectionState.Online(deviceId = "dev-1"),
         )
 
@@ -120,9 +110,7 @@ class ReadinessTest {
     fun p04IdleLeavesSdkStepsUnknown() {
         val report = readiness(
             path = SetupPath.UsbTcpip,
-            developerOptions = Tri.YES,
-            wirelessDebugging = Tri.UNKNOWN,
-            notifications = Tri.YES,
+            checks = checks(),
             state = ConnectionState.Idle,
         )
 
@@ -136,9 +124,7 @@ class ReadinessTest {
     fun p04NotificationDenialIsNotReady() {
         val report = readiness(
             path = SetupPath.WirelessDebugging,
-            developerOptions = Tri.YES,
-            wirelessDebugging = Tri.YES,
-            notifications = Tri.NO,
+            checks = checks(wirelessDebugging = Tri.YES, notifications = Tri.NO),
             state = ConnectionState.Idle,
         )
 
@@ -146,18 +132,68 @@ class ReadinessTest {
         assertFalse(report.ready)
     }
 
+    // P04 battery: both supported paths report the battery step.
+    @Test
+    fun p04BothPathsIncludeTheBatteryStep() {
+        val wireless = readiness(
+            path = SetupPath.WirelessDebugging,
+            checks = checks(wirelessDebugging = Tri.YES),
+            state = ConnectionState.Idle,
+        )
+        val usb = readiness(
+            path = SetupPath.UsbTcpip,
+            checks = checks(),
+            state = ConnectionState.Idle,
+        )
+
+        assertEquals(Tri.YES, wireless.steps[Step.BATTERY])
+        assertEquals(Tri.YES, usb.steps[Step.BATTERY])
+    }
+
+    // P04 battery: an optimized app counts as NO and blocks readiness, like notifications.
+    @Test
+    fun p04OptimizedBatteryIsNotReady() {
+        val report = readiness(
+            path = SetupPath.WirelessDebugging,
+            checks = checks(wirelessDebugging = Tri.YES, battery = Tri.NO),
+            state = ConnectionState.Idle,
+        )
+
+        assertEquals(Tri.NO, report.steps[Step.BATTERY])
+        assertFalse(report.ready)
+    }
+
+    // P04 battery: an unreadable battery state does not block the rest.
+    @Test
+    fun p04UnknownBatteryDoesNotBlockReadiness() {
+        val report = readiness(
+            path = SetupPath.UsbTcpip,
+            checks = checks(notifications = Tri.UNKNOWN, battery = Tri.UNKNOWN),
+            state = ConnectionState.Online(deviceId = "dev-1", adbdEndpoint = "127.0.0.1:5555"),
+        )
+
+        assertEquals(Tri.UNKNOWN, report.steps[Step.BATTERY])
+        assertTrue(report.ready)
+    }
+
     // P04: a policy-forbidden USB fallback reports no steps and is never ready.
     @Test
     fun p04UnsupportedPathIsNeverReady() {
         val report = readiness(
             path = SetupPath.Unsupported(SetupPath.Reason.USB_FALLBACK_FORBIDDEN),
-            developerOptions = Tri.YES,
-            wirelessDebugging = Tri.YES,
-            notifications = Tri.YES,
+            checks = checks(wirelessDebugging = Tri.YES),
             state = ConnectionState.Online(deviceId = "dev-1", adbdEndpoint = "192.168.1.5:37001"),
         )
 
         assertTrue(report.steps.isEmpty())
         assertFalse(report.ready)
     }
+
+    // Only the test helper relaxes the four checks; production DeviceChecks has no defaults.
+    private fun checks(
+        developerOptions: Tri = Tri.YES,
+        wirelessDebugging: Tri = Tri.UNKNOWN,
+        notifications: Tri = Tri.YES,
+        battery: Tri = Tri.YES,
+    ): DeviceChecks = DeviceChecks(developerOptions, wirelessDebugging, notifications, battery)
 }
