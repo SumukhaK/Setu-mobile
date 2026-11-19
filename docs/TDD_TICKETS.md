@@ -291,7 +291,7 @@ The repos are still wireframes, so the tickets fix a stack. Change it once, here
 
 ### AT-07 · Connected desktops and End session
 - **Files:** `feature/host/SessionsList.kt`, `SessionRow.kt`.
-- **Tests first:** P10 (rewritten: label shown as unverified, transport, path, End → `endSession(id)` true; unknown id → false, no crash), P14 phone half (row shows "reconnecting" on `DOWN`, removed on close), P22 phone half.
+- **Tests first:** P10 (rewritten: label shown under **Connected as (unverified)** (AD-3), transport, path, End → `endSession(id)` true; unknown id → false, no crash; the row stays as "Ending…" until the `sessions` snapshot drops it, and the host and other rows keep running), P14 phone half (row shows "reconnecting" on `DOWN`, removed on close), P22 phone half.
 - **SDK binding:** `SetuManager.sessions: StateFlow<List<DeviceSession>>`, `DeviceSession(id, peerLabel, transport, kind, openedAtMs, path)`, `PathState`, `endSession(id)`.
 
 ### AT-08 · Debugger recovery and system pairing guidance
