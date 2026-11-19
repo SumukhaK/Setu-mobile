@@ -196,7 +196,7 @@ function hostStatus() {
 }
 
 function stopControl() {
-  return button("Stop Hosting", "stop-hosting", "danger-button wide", "stop");
+  return button("Stop hosting", "stop-hosting", "danger-button wide", "stop");
 }
 
 function sessionCards() {
@@ -349,7 +349,7 @@ function guideContent(step) {
     }
     case "permission":
       return ["What the notification shows", stack(
-        '<p class="muted">While hosting, Setu’s ongoing notice offers Stop Hosting. The notice never includes Setu or Android pairing codes. The companion uses Android’s <code>VISIBILITY_SECRET</code> to hide the notice on a secure lock screen.</p>',
+        '<p class="muted">While hosting, Setu’s ongoing notice offers Stop hosting. The notice never includes Setu or Android pairing codes. The companion uses Android’s <code>VISIBILITY_SECRET</code> to hide the notice on a secure lock screen.</p>',
         notice(state.android >= 13
           ? "Android 13+ asks for POST_NOTIFICATIONS. Declining can hide the notice from the drawer. Hosting can still run, and you can stop it in Setu."
           : "Manage Setu’s notice in Android Settings."),
@@ -387,7 +387,7 @@ function settingsSheet() {
       returnFromSettings(),
     )];
     case "permission": return [state.android >= 13 ? "Allow Setu to send notifications?" : "Android Settings · Notifications", stack(
-      '<p class="muted">Show an ongoing notice with a Stop Hosting action while Setu is hosting.</p>',
+      '<p class="muted">Show an ongoing notice with a Stop hosting action while Setu is hosting.</p>',
       actions(button("Don’t allow", "deny-notifications", "secondary"), button("Allow", "allow-notifications", "primary")),
     )];
     case "miui": return ["Xiaomi Settings · Developer options", stack(
