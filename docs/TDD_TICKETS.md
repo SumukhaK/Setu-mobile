@@ -11,7 +11,7 @@ Companion to the first architecture and UX audit against v1.0.1.
 Updated by the post-merge ritual. Desktop (DT-*) status is tracked in Setu-Desktop's copy of this file.
 
 - [x] AT-01 · Project scaffold and SDK test seam · Done in [#4](https://github.com/SumukhaK/Setu-mobile/pull/4)
-- [ ] AT-02 · Hosting foreground service and notification
+- [x] AT-02 · Hosting foreground service and notification · Done in [#6](https://github.com/SumukhaK/Setu-mobile/pull/6)
 - [ ] AT-03 · Readiness engine
 - [ ] AT-04 · Battery and OEM readiness, MIUI install recovery
 - [ ] AT-05 · Guided setup UI
@@ -270,7 +270,7 @@ The repos are still wireframes, so the tickets fix a stack. Change it once, here
 
 ### AT-03 · Readiness engine
 - **Files:** `core/readiness/.../SetupPathDetector.kt` (API level + `ConnectivityManager` transport → `WirelessDebugging` or `UsbTcpip`), `DeveloperOptionsCheck.kt` (`Settings.Global.DEVELOPMENT_SETTINGS_ENABLED`), `WirelessDebuggingCheck.kt` (best effort; confirm via SDK `Online.adbdEndpoint` and `warning`), `NotificationCheck.kt`, `RecheckOnResume.kt`.
-- **Tests first:** P04 (branch selection for 10/Wi-Fi, 11/Wi-Fi, 15/cellular; policy can forbid the USB fallback).
+- **Tests first:** P04 (branch selection for 10/Wi-Fi, 11/Wi-Fi, 15/cellular; policy can forbid the USB fallback). The USB-fallback permission is an input to the detector here; its EMM source (an app restriction) is wired in AT-09 (CODEBASE_MEMORY AD-12).
 - **SDK binding:** `ConnectionState.Online.adbdEndpoint`, `Online.warning` (`adbd_unreachable`).
 
 ### AT-04 · Battery and OEM readiness, MIUI install recovery

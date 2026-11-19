@@ -1,84 +1,115 @@
-# Builder prompt · AT-02 · Hosting foreground service and notification
+# Builder prompt · AT-03 · Readiness engine
 
 You are the builder for one ticket in `SumukhaK/Setu-mobile`. Do this ticket only, open one PR, then stop.
 
 ## 0. Read first (in this order, nothing else)
 
-1. `docs/CODEBASE_MEMORY.md` (repo map, interfaces, AD-1 to AD-10).
-2. `docs/TDD_TICKETS.md` §2.6 (notification decision) and §6 "AT-02".
-3. Setu-Desktop `docs/JOURNEYS.md` rows P06 and P17: https://github.com/SumukhaK/Setu-Desktop/blob/main/docs/JOURNEYS.md
-4. Setu-SDK v1.1.0 `API_SPEC.md` §4.1 (`SetuManager`) and §4.4 (notifications): https://github.com/SumukhaK/Setu/blob/v1.1.0/API_SPEC.md
-5. Existing code you will extend: `core/setu/src/main/.../SetuHost.kt`, `SetuManagerHost.kt`, `core/setu/src/test/.../SetuManagerHostTest.kt`, `app/src/main/AndroidManifest.xml`, `app/build.gradle.kts`.
-
-The SDK's sample `AgentService` uses `VISIBILITY_PRIVATE` and posts `text`. **Do not copy it.** This ticket uses the stricter rule in AD-2.
+1. `docs/CODEBASE_MEMORY.md` (interfaces, AD-1 to AD-12; AD-12 is new for this ticket).
+2. `docs/TDD_TICKETS.md` §6 "AT-03".
+3. Setu-Desktop `docs/JOURNEYS.md` section J2 ("Prepare the phone") and row P04: https://github.com/SumukhaK/Setu-Desktop/blob/main/docs/JOURNEYS.md
+4. `docs/SCREENS.md` rows A02, A03 and A04 (which screens will consume this, not built here).
+5. Setu-SDK v1.1.0 `API_SPEC.md` §4.2 (`ConnectionState.Online.adbdEndpoint`, `warning`; `SetuConfig.adbd`) and §1.5 (`adbd_unreachable`): https://github.com/SumukhaK/Setu/blob/v1.1.0/API_SPEC.md
 
 ## 1. Goal
 
-Add a foreground service that owns the Setu agent's lifecycle and a lock-screen-safe notification. It is the only place that calls `SetuManager.initialize`, `start`, `stop` and `refreshPolicy`. It reacts to EMM restriction changes and keeps the notification in sync with `connectionState` and `sessions`. There is no UI work: AT-05 and AT-06 will call the service's start and stop helpers.
+Add a new `:core:readiness` module that decides the phone's setup path and reports which readiness steps are done, so the guided setup UI (AT-05) can render it later. Most of it is pure Kotlin. Platform reads (API level, Wi-Fi, Developer options, Wireless debugging, notifications) are thin and replaceable in tests. No UI, no navigation and no ViewModels are in this ticket.
 
 ## 2. Files (create or change only these)
 
 ```
-core/setu/src/main/.../SetuHost.kt                  add sessions, refreshPolicy, nullable start (see §3)
-core/setu/src/main/.../SetuManagerHost.kt           delegate the new members
-core/setu/src/test/.../SetuManagerHostTest.kt       add one wiring test for sessions (see §4)
-app/src/main/AndroidManifest.xml                    service, FGS permissions, special-use property
-app/src/main/kotlin/dev/setu/mobile/service/HostingService.kt
-app/src/main/kotlin/dev/setu/mobile/service/HostingNotification.kt
-app/src/main/res/values/strings.xml                 channel name, FGS subtype text (create if absent)
-app/src/test/kotlin/dev/setu/mobile/service/FakeSetuHost.kt
-app/src/test/kotlin/dev/setu/mobile/service/HostingNotificationTest.kt
-app/src/test/kotlin/dev/setu/mobile/service/HostingServiceTest.kt
-app/build.gradle.kts + gradle/libs.versions.toml    only if you add androidx-core-ktx (see §3); also remove the unused debugImplementation(ui-test-manifest)
+settings.gradle.kts                              include(":core:readiness")
+core/readiness/build.gradle.kts                  android library, namespace dev.setu.mobile.core.readiness; deps: project(":core:setu"), androidx-core-ktx, lifecycle-common (for RecheckOnResume)
+gradle/libs.versions.toml                        add androidx-lifecycle-common only if not present
+core/readiness/src/main/kotlin/dev/setu/mobile/core/readiness/SetupPath.kt
+core/readiness/src/main/kotlin/dev/setu/mobile/core/readiness/SetupPathDetector.kt
+core/readiness/src/main/kotlin/dev/setu/mobile/core/readiness/DeveloperOptionsCheck.kt
+core/readiness/src/main/kotlin/dev/setu/mobile/core/readiness/WirelessDebuggingCheck.kt
+core/readiness/src/main/kotlin/dev/setu/mobile/core/readiness/NotificationCheck.kt
+core/readiness/src/main/kotlin/dev/setu/mobile/core/readiness/Readiness.kt
+core/readiness/src/main/kotlin/dev/setu/mobile/core/readiness/RecheckOnResume.kt
+core/readiness/src/test/kotlin/dev/setu/mobile/core/readiness/...Test.kt   one test file per main file where it has logic
 ```
+
+The module copies the lint block (including the three AD-8 version checks) and the JVM 17 settings from `core/setu/build.gradle.kts`. Detekt is applied by the root build.
 
 ## 3. Contract to implement (decided by the architect; do not reinterpret)
 
-**`SetuHost` changes (AD-7).** These mirror the SDK's own signatures:
+**Types (`SetupPath.kt`).**
 
 ```kotlin
-interface SetuHost {
-    val connectionState: StateFlow<ConnectionState>
-    val policyStatus: StateFlow<PolicyStatus>
-    val sessions: StateFlow<List<DeviceSession>>
-    fun start(config: SetuConfig? = null)   // null reuses the last config (SDK behaviour)
-    fun stop()
-    fun refreshPolicy(): PolicyStatus
+enum class Tri { YES, NO, UNKNOWN }
+
+sealed interface SetupPath {
+    data object WirelessDebugging : SetupPath                 // Android 11+ on Wi-Fi
+    data object UsbTcpip : SetupPath                          // Android 10, or any version without Wi-Fi, when allowed
+    data class Unsupported(val reason: Reason) : SetupPath
+    enum class Reason { USB_FALLBACK_FORBIDDEN }
 }
 ```
 
-`SetuManagerHost` still only delegates. Existing AT-01 tests must stay green without edits, apart from the one added test.
+**Detector (`SetupPathDetector.kt`).** The decision is a pure function, plus one platform reader:
+- `fun detectSetupPath(sdkInt: Int, onWifi: Boolean, usbFallbackAllowed: Boolean): SetupPath`:
+  - If `sdkInt >= 30 && onWifi`, return `WirelessDebugging`. `usbFallbackAllowed` doesn't matter here.
+  - Otherwise, return `UsbTcpip` if `usbFallbackAllowed`, else `Unsupported(USB_FALLBACK_FORBIDDEN)`. The UI later says "contact IT or use supported Wi-Fi".
+- `class NetworkReader(context: Context) { fun onWifi(): Boolean }` reads `ConnectivityManager.getNetworkCapabilities(activeNetwork)?.hasTransport(TRANSPORT_WIFI) == true`. No callbacks or listeners: AT-05 re-reads on resume.
+- AD-12: `usbFallbackAllowed` is a parameter, and nothing in this ticket reads EMM restrictions.
 
-**`HostingNotification` (P06, AD-2).** It has no state and no SDK calls of its own.
-- `fun build(context: Context, content: NotificationContent): Notification`, using the platform `Notification.Builder` (minSdk 29 needs no compat).
-- Title is `content.title`. Content text is `content.publicText` in **both** the main notification and the `setPublicVersion(...)` copy. `content.text` is never read.
-- Use `setVisibility(Notification.VISIBILITY_SECRET)`, `setOngoing(true)` and `setOnlyAlertOnce(true)`, on channel id `"hosting"`. Use a platform small icon (`android.R.drawable.stat_sys_data_bluetooth`) for now.
-- `fun ensureChannel(context: Context)` creates channel `"hosting"` with `IMPORTANCE_LOW` and the name from `strings.xml`.
-- Notification id is the constant `NOTIFICATION_ID = 1`.
+**Checks (each a small class taking `Context`, with one function returning `Tri`).**
+- `DeveloperOptionsCheck.enabled()`: `Settings.Global.DEVELOPMENT_SETTINGS_ENABLED == 1` → YES, `0` → NO. If the setting is missing (`SettingNotFoundException`), return NO.
+- `WirelessDebuggingCheck.enabled()` is best effort. Read `Settings.Global` key `"adb_wifi_enabled"` (hidden on API 30+, but readable): 1 → YES, 0 → NO. If it's missing, or on API < 30, return UNKNOWN. Never throw.
+- `NotificationCheck.granted()`: on API 33+, `checkSelfPermission(POST_NOTIFICATIONS) == GRANTED` → YES, else NO. Below 33, use `NotificationManagerCompat.areNotificationsEnabled()`.
 
-**`HostingService` (AD-1).** It is an `open class HostingService : Service()` that is not exported and declares `android:foregroundServiceType="specialUse"`. Add a `<property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="@string/fgs_subtype"/>` that explains the use, for example "Hosts an encrypted remote ADB debugging session for a paired desktop". Add the `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE` and `POST_NOTIFICATIONS` permissions. The SDK's network permissions already merge in from the AAR, so don't add them.
-- Companion helpers: `fun start(context: Context, relayUrl: String)` calls `startForegroundService` with extra `EXTRA_RELAY_URL`. `fun stop(context: Context)` calls `stopService`.
-- `protected open fun createHost(): SetuHost = SetuManagerHost(SetuManager.initialize(SetuManager.Builder(this)))`. This is the only `initialize` call in the app. Tests subclass the service and override it. Don't use a global or static test hook.
-- `onCreate`: create the host and the channel. Register a receiver for `Intent.ACTION_APPLICATION_RESTRICTIONS_CHANGED` with `ContextCompat.registerReceiver(..., ContextCompat.RECEIVER_NOT_EXPORTED)`, and add `androidx-core-ktx` to the catalog if it isn't declared. On receive, call `host.refreshPolicy()` then `host.start()`. Then collect `combine(host.connectionState, host.sessions, SetuNotifications::content)` on a `MainScope()` and post each result through `NotificationManager.notify(NOTIFICATION_ID, HostingNotification.build(...))`.
-- `onStartCommand`: first call `startForeground(NOTIFICATION_ID, HostingNotification.build(this, SetuNotifications.content(host.connectionState.value, host.sessions.value)), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)`. Then call `host.start(SetuConfig(relayUrl = it))` if the intent carries a relay URL, otherwise `host.start()`. Return `START_NOT_STICKY` (no persistence; settings storage arrives in AT-10).
-- If `host.start` throws `GenAdbException.NotConfigured`, call `stopSelf()` and don't crash. Catch only that exception. Don't wrap anything else in `runCatching`.
-- `onDestroy`: call `host.stop()`, unregister the receiver, cancel the scope, and `stopForeground(STOP_FOREGROUND_REMOVE)`.
-- Never log anything, and never put `content.text` or a pairing code into an intent, a log or a notification.
+**Readiness (`Readiness.kt`).** This is a pure function with no Android types except SDK models:
+
+```kotlin
+enum class Step { DEVELOPER_OPTIONS, WIRELESS_DEBUGGING, USB_TCPIP_ENDPOINT, NOTIFICATIONS, AGENT_REACHES_ADBD }
+
+data class ReadinessReport(val path: SetupPath, val steps: Map<Step, Tri>) {
+    val ready: Boolean get() = path !is SetupPath.Unsupported && steps.values.none { it == Tri.NO }
+}
+
+fun readiness(
+    path: SetupPath,
+    developerOptions: Tri,
+    wirelessDebugging: Tri,
+    notifications: Tri,
+    state: ConnectionState,
+): ReadinessReport
+```
+
+Rules (J2):
+- `WirelessDebugging` path steps: `DEVELOPER_OPTIONS`, `WIRELESS_DEBUGGING`, `NOTIFICATIONS`, `AGENT_REACHES_ADBD`.
+- `UsbTcpip` path steps: `DEVELOPER_OPTIONS`, `USB_TCPIP_ENDPOINT`, `NOTIFICATIONS`, `AGENT_REACHES_ADBD`.
+- `Unsupported`: steps are empty.
+- `AGENT_REACHES_ADBD` comes only from the SDK. `Online` with `adbdEndpoint != null` gives YES. `Online` whose `warning` contains `"adbd_unreachable"` gives NO. Any other state gives UNKNOWN.
+- SDK evidence wins over the best-effort setting. When `AGENT_REACHES_ADBD == YES` on the Wireless path, `WIRELESS_DEBUGGING` is YES even if the setting read NO or UNKNOWN.
+- `USB_TCPIP_ENDPOINT` is YES only when `Online.adbdEndpoint == "127.0.0.1:5555"`. `Online` with another endpoint or the `adbd_unreachable` warning gives NO. Any other state gives UNKNOWN.
+- `NOTIFICATIONS: NO` doesn't block hosting (P06), but it still counts as NO in `ready`. AT-05 decides how to present it. Don't special-case it here.
+
+**`RecheckOnResume.kt`.** `class RecheckOnResume(private val onRecheck: () -> Unit) : DefaultLifecycleObserver` calls `onRecheck()` in `onResume`. Nothing else: AT-05 attaches it.
 
 ## 4. TDD: write these tests first, see them fail, then implement
 
-Map each test to its acceptance ID in a comment. Use Robolectric with `@Config(sdk = [35])` unless noted.
+Map each test to its acceptance ID in a comment. Use JUnit 4. Use Robolectric (`@Config(sdk = [...])`) only for the platform readers.
 
-- **P06, notification:** given `SetuNotifications.content(ConnectionState.Online(deviceId = "dev-1", pairingCode = "4321-908172"), emptyList())`, the built notification has `visibility == VISIBILITY_SECRET`, its `EXTRA_TEXT` equals `content.publicText`, and its `publicVersion` text equals `content.publicText`. Gather every `CharSequence` in `extras` for both versions, plus `tickerText`. None of them contains `"4321-908172"` or `"4321908172"`. Add a table over `Idle`, `Starting`, `Reconnecting`, `Blocked` and `PolicyMissing` checking the same rule: text is always `publicText`.
-- **P06, permission denied (`@Config(sdk = [33])`):** with `POST_NOTIFICATIONS` denied through the shadow app, starting the service still calls `host.start(...)` once and doesn't throw.
-- **Start:** `onStartCommand` with `EXTRA_RELAY_URL = "wss://relay.test/"` puts the service in the foreground with the notification id and calls `FakeSetuHost.start` once with that URL. Without the extra, it calls `start(null)`.
-- **Notification follows state:** after `FakeSetuHost` moves `connectionState` to `Online(...)` and `sessions` to one session, the posted notification text equals `SetuNotifications.content(state, sessions).publicText`. Idle the main looper; don't sleep.
-- **Restrictions changed:** broadcasting `ACTION_APPLICATION_RESTRICTIONS_CHANGED` calls `refreshPolicy()` then `start(null)`, in that order.
-- **NotConfigured:** when `FakeSetuHost.start` throws `GenAdbException.NotConfigured()`, the service stops itself and nothing throws.
-- **P17, stop hosting:** destroying the service calls `host.stop()` once, removes the foreground notification, and unregisters the receiver, so a later broadcast doesn't call `refreshPolicy`.
-- **`:core:setu` wiring:** using the existing real-SDK seam, after `session_open` (`{"event":"session_open","session_id":"a1","peer_label":"ci-laptop","transport":"relay-wss","kind":"adb"}`), `host.sessions` holds one session with id `a1`. After `host.stop()`, it's empty.
+- **P04 branch table (pure):** check `detectSetupPath` for every row, in a parameterised or table-driven test:
 
-`FakeSetuHost` is a plain class with `MutableStateFlow`s and call recorders. It has no mocking library and no logic beyond recording (AD-10).
+  | sdkInt | onWifi | usbAllowed | expected |
+  | --- | --- | --- | --- |
+  | 29 | true | true | UsbTcpip |
+  | 30 | true | true | WirelessDebugging |
+  | 35 | false | true | UsbTcpip |
+  | 35 | true | false | WirelessDebugging |
+  | 29 | true | false | Unsupported(USB_FALLBACK_FORBIDDEN) |
+  | 35 | false | false | Unsupported(USB_FALLBACK_FORBIDDEN) |
+
+- **P04 readiness (pure):** the Wireless path shows the right step set. SDK `Online(adbdEndpoint="192.168.1.5:37001")` overrides a NO wireless setting to YES. `Online(warning="adbd_unreachable: …")` gives `AGENT_REACHES_ADBD = NO` and `ready == false`. The USB path with `Online(adbdEndpoint="127.0.0.1:5555")` makes `USB_TCPIP_ENDPOINT` YES, while `"127.0.0.1:5556"` gives NO. With `Idle`, the SDK steps are UNKNOWN and `ready == true` only if nothing is NO. `Unsupported` is never ready.
+- **Platform readers (Robolectric):**
+  - `DeveloperOptionsCheck` returns 1 → YES, 0 → NO and missing → NO (use `Settings.Global.putInt` in the test).
+  - `WirelessDebuggingCheck` returns YES/NO from the key on sdk 35, UNKNOWN when missing, and UNKNOWN on sdk 29.
+  - `NotificationCheck` on sdk 33 returns YES/NO via the shadow app's grant/deny.
+  - `NetworkReader.onWifi()` returns true for a Wi-Fi active network and false for cellular (use `ShadowNetworkCapabilities` / `ShadowConnectivityManager`).
+- **RecheckOnResume:** with a `TestLifecycleOwner` or a `LifecycleRegistry` moved to RESUMED twice (pause in between), `onRecheck` runs twice.
 
 ## 5. Gates (all must pass before you push)
 
@@ -87,22 +118,22 @@ Map each test to its acceptance ID in a comment. Use Robolectric with `@Config(s
 ./gradlew :app:assembleDebug
 ```
 
-Use no `@Suppress`, no baselines, and disable no new lint checks (AD-8). If a gate fails for a reason outside this ticket, stop and report the exact error.
+Use no `@Suppress`, no baselines, and disable no new lint checks (AD-8). Reading the hidden `adb_wifi_enabled` key by its string name must not need a suppression. If lint objects, stop and report the exact error.
 
 ## 6. Architecture and Karpathy pillars (enforced at review)
 
-- **Clean Architecture and SOLID.** The service depends on `SetuHost`, never on `SetuManager`, except in the one `createHost()` line (DIP). `HostingNotification` only builds, and `HostingService` only does lifecycle and wiring (SRP). Don't add ViewModels, use cases, DI frameworks, Application subclasses or a repository layer: no ticket needs them yet.
-1. **Think before coding.** The PR description opens with `## Assumptions & Trade-offs`. If the ticket, this prompt, JOURNEYS and `API_SPEC.md` disagree, stop and ask.
-2. **Simplicity first.** Write the minimum code: no wake locks, no boot receiver, no notification actions or "Stop" button (AT-06), no session list, no retries. Keep files under ~250–300 lines.
-3. **Surgical changes.** Touch only the files in §2. Don't edit `docs/`, `README.md` or the prototype. Branch from latest `main` as `feature/AT-02-hosting-service`. Make atomic conventional commits, for example `test(android): add hosting service and notification tests`, `feat(android): extend SetuHost with sessions and refreshPolicy`, `feat(android): add hosting foreground service with lock-screen-safe notification`.
-4. **Goal-driven TDD.** Commit the failing tests first (red), then the implementation (green). Paste the exact gate output in the PR.
+- **Clean Architecture and SOLID.** `detectSetupPath` and `readiness` are pure domain functions with no `Context`. The checks and `NetworkReader` are thin data sources. `:core:readiness` depends on `:core:setu` only for SDK model types. `:app` doesn't depend on `:core:readiness` yet: AT-05 adds that.
+1. **Think before coding.** The PR description opens with `## Assumptions & Trade-offs`. If J2, P04, this prompt and the SDK disagree, stop and ask.
+2. **Simplicity first.** Write the minimum code: no Flows or callbacks for network changes, no ViewModel, no DI, no OEM or battery checks (AT-04), no intents to open Settings (AT-05), no caching. Keep files under ~250–300 lines; most should be under 60.
+3. **Surgical changes.** Touch only the files in §2. Don't edit `:app`, `:core:setu`, `docs/` or the prototype. Branch from latest `main` as `feature/AT-03-readiness-engine`. Make atomic conventional commits (`test(android): …` red first, then `feat(android): …`).
+4. **Goal-driven TDD.** Commit the failing tests first, then the implementation. Paste the exact gate output in the PR.
 
 ## 7. PR and hard stop
 
-Open one PR against `main` titled `feat(android): AT-02 hosting foreground service and notification`, with this body:
+Open one PR against `main` titled `feat(android): AT-03 readiness engine`, with this body:
 
 ```
-Ticket: AT-02 (docs/TDD_TICKETS.md §6) · Acceptance: P06 (clarified), P17 (stop hosting)
+Ticket: AT-03 (docs/TDD_TICKETS.md §6) · Acceptance: P04 (branch selection and readiness)
 
 ## Assumptions & Trade-offs
 - …
@@ -111,11 +142,11 @@ Ticket: AT-02 (docs/TDD_TICKETS.md §6) · Acceptance: P06 (clarified), P17 (sto
 - one line per file
 
 ## Test evidence
-<red run excerpt showing the new tests failing>
+<red run excerpt>
 <full green output of ./gradlew testDebugUnitTest detekt lint and :app:assembleDebug>
 
 ## Out of scope (left for later tickets)
-- readiness (AT-03/04), setup UI and the in-app Stop control (AT-05/AT-06), sessions list and End (AT-07), settings storage for the relay URL (AT-10)
+- battery/OEM/MIUI (AT-04), setup UI, Settings intents and attaching RecheckOnResume (AT-05), EMM source of usbFallbackAllowed (AT-09)
 ```
 
-Then **stop immediately**. Don't start AT-03, don't edit `docs/`, and don't merge.
+Then **stop immediately**. Don't start AT-04, don't edit `docs/`, and don't merge.
