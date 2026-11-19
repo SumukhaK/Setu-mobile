@@ -2,9 +2,9 @@
 
 Re-review date: 2026-11-19 · Reviewed: `SumukhaK/Setu-Desktop` main @ `57fd2d2`, `SumukhaK/Setu-mobile` main @ `2f26889`, `SumukhaK/Setu` tag `v1.1.0` @ `921aded` · Read-only, no repository was changed, MP4s ignored.
 
-Companion to the first architecture and UX audit against the previous SDK baseline.
+Companion to the first architecture and UX audit against v1.0.1.
 
-> **Status in this repository.** The section 2 and section 3 baseline updates are applied in [Setu-Desktop `docs/JOURNEYS.md`](https://github.com/SumukhaK/Setu-Desktop/blob/main/docs/JOURNEYS.md) (canonical, including P01–P22) and in each repository's `docs/SCREENS.md`. The v1.1.0 prototype fixtures in section 2.7 are available in the browser wireframes. Device-lab and native implementation gates remain. The same file lives in both Setu-Desktop and Setu-mobile.
+> **Status in this repository.** The section 2 and section 3 baseline updates are applied in [Setu-Desktop `docs/JOURNEYS.md`](https://github.com/SumukhaK/Setu-Desktop/blob/main/docs/JOURNEYS.md) (canonical, including P01–P22) and in each repository's `docs/SCREENS.md`. The section 2.7 v1.1.0 fixtures are applied in both browser prototypes (2026-11-19 design rebase); the review text below is kept as written on its review date. Device-lab and native implementation gates remain. The same file lives in both Setu-Desktop and Setu-mobile.
 
 ## Ticket status (Setu-mobile)
 
@@ -25,9 +25,9 @@ Updated by the post-merge ritual. Desktop (DT-*) status is tracked in Setu-Deskt
 
 ## 0. Verdict
 
-**The v1.1.0 rebase carries forward the first audit’s corrected layout and replaces obsolete capability placeholders with released SDK bindings.** The four remaining SDK contracts are listed above.
+**The design-level flaws from the first audit are fixed. But the specs were aligned to v1.0.1, not v1.1.0, so they are now one SDK version behind.** Every "magic" state is gone, and `JOURNEYS.md` is honest about what was missing. The problem is that it still labels as "SDK or service gap" most of the capabilities v1.1.0 now ships. If you hand the current specs to a builder model, it will build workarounds, "Unknown" placeholders and "integration preview" banners for things the SDK now provides natively.
 
-The docs and prototypes use the bindings below as their baseline for Ticket 1.
+Before Ticket 1, do a docs-only pass. Rebase `JOURNEYS.md`, both `SCREENS.md` files and both prototypes onto v1.1.0 (section 2), and replace P05, P10, P12 and P14 as written in section 3. It's roughly a day of work and prevents a whole class of wrong code.
 
 Four things are still open after v1.1.0. They are small, but they matter for a corporate product:
 
@@ -69,7 +69,7 @@ Four things are still open after v1.1.0. They are small, but they matter for a c
 
 ### 2.1 Global
 
-- Use **Setu-SDK v1.1.0** at `921aded` in the specs and prototype labels. Pin SDK source links to that revision or release tag.
+- Change the baseline line to: Setu SDK **v1.1.0** at `921aded`. Re-point every `d6335c6` source link to the v1.1.0 tag. Update the desktop footer "Setu SDK v1.0.1" and the Android host text "Setu SDK v1.0.1 reports host status…".
 - Turn each "SDK or service gap" paragraph into an "SDK binding" paragraph naming the method or event below. Keep "SDK or service gap" only for the four open items in section 0.
 - Add a version-skew rule. A v1.1 desktop talking to a v1.0 phone agent gets `-32024 unsupported` for `pair_adb`, and receives no `peer_closed` or session events from that phone. Show "Update Setu on the phone to use this", and never a generic error.
 
@@ -79,7 +79,7 @@ Replace the whole "SDK or service gap" paragraph with:
 
 > Desktop calls `session.pair_adb {device_id, pairing_code, pairing_port?, timeout_ms?}`. `pairing_port` 0 or absent asks the phone to discover `_adb-tls-pairing._tcp` itself, so the form can make the port optional. The six-digit code goes only to the local `adb pair`, and travels inside adb's SPAKE2 exchange, which the tunnel also encrypts. Result: `{device_id, paired, transport, output?}`. Errors: `-32023 adb_pair_failed` (wrong code, dialog closed, wrong port) and `-32024 unsupported` (phone runs a 1.0 agent). An `adb_pair` event reports the outcome. The daemon flag `--adb PATH` selects adb.
 
-D05 drops "requires an adapter and hardware validation". It stays behind a feature flag only until the device-lab run passes. The desktop `wirelessDialog` uses `session.pair_adb`, and the port field is optional with the hint "Leave empty to let the phone find it".
+D05 drops "requires an adapter and hardware validation". It stays behind a feature flag only until the device-lab run passes. Remove the desktop prototype's `wirelessDialog` notice "SDK v1.0.1 has no dedicated pairing RPC", and make the port field optional with the hint "Leave empty to let the phone find it".
 
 ### 2.3 J3 · Device selection, transport and peers
 
@@ -118,7 +118,7 @@ JOURNEYS J2 and P06 say `VISIBILITY_SECRET`, with no code "in either notificatio
 
 ### 2.7 Prototype fixtures to update
 
-- Desktop: the transport strip gets real `path_*` fixtures; the "Rejoin stage · Integration preview" selector becomes event-driven fixtures; the time limit uses the `-32025` end state and only warns early when an authoritative session deadline is provided; add `-32025`, `-32026` and `-32024` scenarios; the pair dialog gets a cancel button bound to `session.cancel`.
+- Desktop: the transport strip gets real `path_*` fixtures; the "Rejoin stage · Integration preview" selector becomes event-driven fixtures; the time-limit banner is replaced by a `-32025` end state; add `-32025`, `-32026` and `-32024` scenarios; the pair dialog gets a cancel button bound to `session.cancel`.
 - Android: the host screen gets a sessions list (peer, transport, path, End); the notification preview shows `publicText` only; add a "peer ended from phone" scenario.
 
 ---

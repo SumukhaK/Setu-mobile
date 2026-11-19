@@ -6,7 +6,7 @@ Browser wireframes for the native Setu Android companion. The prototype targets 
 
 ## Open the current prototype
 
-Open `index.html` in a browser. The scenario selector in the desktop review pane and the phone's three-dot menu can load Wireless debugging setup, the USB fallback, notification denial, managed policy waiting, and host recovery. Solo shows a current numeric Setu code only inside the app. Corporate uses EMM enrollment and grants, and **Stop Hosting** controls the whole device agent. **End** closes one connected computer’s session. Its displayed name is unverified.
+Open `index.html` in a browser. The scenario selector in the desktop review pane and the phone's three-dot menu can load Wireless debugging setup, the USB fallback, notification denial, managed policy waiting, and host recovery. Solo shows a current numeric Setu code only inside the app. Corporate uses EMM enrollment and grants, and **Stop hosting** controls the whole device agent. **End** closes one connected computer’s session. Its displayed name is unverified.
 
 The wireframe uses fixtures. The canonical journeys distinguish Android and SDK capabilities from planned integration, including the separate Android system pairing step.
 

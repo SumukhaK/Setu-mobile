@@ -206,7 +206,7 @@ function sessionCards() {
     const pending = state.pendingEnds.has(id);
     const label = `${pending ? "Ending" : "End session for"} ${name}`;
     return `<li class="peer-session" data-session-id="${escaped(id)}"><div class="peer-identity">
-      <span>Computer name (unverified)</span><strong>${name}</strong>
+      <span>Connected as (unverified)</span><strong>${name}</strong>
       <p>${kind === "adb-pair" ? "Android debugger pairing" : "ADB debugging"} · ${channel}</p>
       ${tag(pathLabels[status], status === "UP" ? "" : "warn")}</div>
       ${button(pending ? "Ending…" : "End", "end-peer", "secondary", "", `aria-label="${label}"${pending ? " disabled" : ""}`)}</li>`;
@@ -441,10 +441,10 @@ function sheetContent() {
       const session = state.sessions.find(({ id }) => id === state.selectedSession);
       if (!session) return ["Session already closed", button("Done", "close-sheet", "secondary wide")];
       return ["End this session?", stack(
-        panel(metadata(["Computer name (unverified)", escaped(session.peerLabel.trim() || "Unnamed computer")])),
+        panel(metadata(["Connected as (unverified)", escaped(session.peerLabel.trim() || "Unnamed computer")])),
         `<p class="muted">${session.path === "UP"
           ? "Setu sends a final close to the desktop so it can end the session without retrying."
-          : "Setu ends the session here. The computer may miss the close notice while its connection is down."} Other sessions and existing access stay in place.</p>`,
+          : "Setu ends the session on this phone now. Its connection to the computer is down, so the computer may not see the end until it reconnects or times out."} Other sessions and existing access stay in place.</p>`,
         actions(button("Cancel", "close-sheet", "secondary"), button("End session", "confirm-end-peer", "danger-button", "stop")),
       )];
     }
@@ -678,10 +678,10 @@ function applyScenario(scenario, headingFocus = false) {
   if (hostScenarios.includes(scenario)) state.host = "online";
   if (["hosting", "hosting-unnamed", "path-down", "path-lost", "managed-hosting"].includes(scenario)) {
     const id = "4be1c0d2a9f37e11";
-    applySessionEvent("session_open", { id, peerLabel: scenario === "hosting-unnamed" ? "" : "QA Workstation", transport: "relay-wss", kind: "adb" });
+    applySessionEvent("session_open", { id, peerLabel: scenario === "hosting-unnamed" ? "desktop-3fa9c1d2" : "QA Workstation", transport: "relay-wss", kind: "adb" });
     applySessionEvent("session_open", {
       id: "5bf2d5b8a8c4f012",
-      peerLabel: scenario === "hosting-unnamed" ? "Northstar IT administrator" : "Test Bench 02",
+      peerLabel: scenario === "hosting-unnamed" ? "alice@northstar.example" : "Test Bench 02",
       transport: state.managed ? "relay-wss" : "lan",
       kind: scenario === "hosting-unnamed" ? "adb-pair" : "adb",
     });
