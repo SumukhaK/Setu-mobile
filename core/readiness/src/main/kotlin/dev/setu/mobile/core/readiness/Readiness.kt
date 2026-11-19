@@ -2,35 +2,45 @@ package dev.setu.mobile.core.readiness
 
 import dev.genadb.sdk.ConnectionState
 
-enum class Step { DEVELOPER_OPTIONS, WIRELESS_DEBUGGING, USB_TCPIP_ENDPOINT, NOTIFICATIONS, AGENT_REACHES_ADBD }
+enum class Step {
+    DEVELOPER_OPTIONS,
+    WIRELESS_DEBUGGING,
+    USB_TCPIP_ENDPOINT,
+    NOTIFICATIONS,
+    BATTERY,
+    AGENT_REACHES_ADBD,
+}
+
+data class DeviceChecks(
+    val developerOptions: Tri,
+    val wirelessDebugging: Tri,
+    val notifications: Tri,
+    val battery: Tri,
+)
 
 data class ReadinessReport(val path: SetupPath, val steps: Map<Step, Tri>) {
     val ready: Boolean get() = path !is SetupPath.Unsupported && steps.values.none { it == Tri.NO }
 }
 
-fun readiness(
-    path: SetupPath,
-    developerOptions: Tri,
-    wirelessDebugging: Tri,
-    notifications: Tri,
-    state: ConnectionState,
-): ReadinessReport {
+fun readiness(path: SetupPath, checks: DeviceChecks, state: ConnectionState): ReadinessReport {
     if (path is SetupPath.Unsupported) return ReadinessReport(path, emptyMap())
 
     val agent = agentStep(state)
-    val sdkWireless = if (agent == Tri.YES) Tri.YES else wirelessDebugging
+    val sdkWireless = if (agent == Tri.YES) Tri.YES else checks.wirelessDebugging
     val steps = if (path is SetupPath.WirelessDebugging) {
         mapOf(
-            Step.DEVELOPER_OPTIONS to developerOptions,
+            Step.DEVELOPER_OPTIONS to checks.developerOptions,
             Step.WIRELESS_DEBUGGING to sdkWireless,
-            Step.NOTIFICATIONS to notifications,
+            Step.NOTIFICATIONS to checks.notifications,
+            Step.BATTERY to checks.battery,
             Step.AGENT_REACHES_ADBD to agent,
         )
     } else {
         mapOf(
-            Step.DEVELOPER_OPTIONS to developerOptions,
+            Step.DEVELOPER_OPTIONS to checks.developerOptions,
             Step.USB_TCPIP_ENDPOINT to usbEndpointStep(state),
-            Step.NOTIFICATIONS to notifications,
+            Step.NOTIFICATIONS to checks.notifications,
+            Step.BATTERY to checks.battery,
             Step.AGENT_REACHES_ADBD to agent,
         )
     }
