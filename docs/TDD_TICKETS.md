@@ -12,7 +12,7 @@ Updated by the post-merge ritual. Desktop (DT-*) status is tracked in Setu-Deskt
 
 - [x] AT-01 · Project scaffold and SDK test seam · Done in [#4](https://github.com/SumukhaK/Setu-mobile/pull/4)
 - [x] AT-02 · Hosting foreground service and notification · Done in [#6](https://github.com/SumukhaK/Setu-mobile/pull/6)
-- [ ] AT-03 · Readiness engine
+- [x] AT-03 · Readiness engine · Done in [#8](https://github.com/SumukhaK/Setu-mobile/pull/8)
 - [ ] AT-04 · Battery and OEM readiness, MIUI install recovery
 - [ ] AT-05 · Guided setup UI
 - [ ] AT-06 · Solo hosting screen
@@ -274,12 +274,13 @@ The repos are still wireframes, so the tickets fix a stack. Change it once, here
 - **SDK binding:** `ConnectionState.Online.adbdEndpoint`, `Online.warning` (`adbd_unreachable`).
 
 ### AT-04 · Battery and OEM readiness, MIUI install recovery
-- **Files:** `core/readiness/.../BatteryCheck.kt` (`isIgnoringBatteryOptimizations`), `oem/OemIntents.kt` (resolve before launch, fall back to app details), `feature/setup/MiuiInstallSheet.kt`.
-- **Tests first:** P04 OEM part, P06 denial path (hosting continues, in-app Stop visible).
+- **Files:** `core/readiness/.../BatteryCheck.kt` (`isIgnoringBatteryOptimizations`), `oem/Oem.kt` (manufacturer → vendor family), `oem/OemIntents.kt` (resolve before launch, fall back to system battery settings and app details), `Readiness.kt` (adds `Step.BATTERY`), `AndroidManifest.xml` (`<queries>`).
+- **Tests first:** P04 OEM part (vendor detection, only resolvable destinations offered, app-details fallback always present), battery YES/NO. The P06 denial path (hosting continues without notification permission) is already covered by AT-02's `HostingServiceTest`; the in-app Stop is AT-06.
+- **MIUI install recovery:** AT-04 only detects the Xiaomi family (`Oem.XIAOMI`). The help sheet itself (`MiuiInstallSheet.kt`) is UI and moves to AT-05 (CODEBASE_MEMORY AD-13).
 - **SDK binding:** none (platform only).
 
 ### AT-05 · Guided setup UI
-- **Files:** `feature/setup/SetupScreen.kt`, `SetupViewModel.kt`, `steps/*.kt` (Developer options, Wireless debugging, USB tcpip bootstrap with endpoint check, notifications, battery).
+- **Files:** `feature/setup/SetupScreen.kt`, `SetupViewModel.kt`, `steps/*.kt` (Developer options, Wireless debugging, USB tcpip bootstrap with endpoint check, notifications, battery and OEM destinations from AT-04), `MiuiInstallSheet.kt` (moved from AT-04, shown for `Oem.XIAOMI`), attaches `RecheckOnResume`.
 - **Tests first:** P04 end to end with fakes; the USB branch requires `Online.adbdEndpoint == 127.0.0.1:5555` before "unplug".
 - **SDK binding:** `connectionState`, `Online.adbdEndpoint`.
 
