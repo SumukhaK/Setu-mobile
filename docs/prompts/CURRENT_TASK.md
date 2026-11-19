@@ -20,7 +20,7 @@ Extend `:core:readiness` with a battery-optimization check, a vendor (OEM) famil
 core/readiness/src/main/kotlin/dev/setu/mobile/core/readiness/BatteryCheck.kt          new
 core/readiness/src/main/kotlin/dev/setu/mobile/core/readiness/oem/Oem.kt               new
 core/readiness/src/main/kotlin/dev/setu/mobile/core/readiness/oem/OemIntents.kt        new
-core/readiness/src/main/kotlin/dev/setu/mobile/core/readiness/Readiness.kt             change: Step.BATTERY + battery param
+core/readiness/src/main/kotlin/dev/setu/mobile/core/readiness/Readiness.kt             change: Step.BATTERY + DeviceChecks
 core/readiness/src/main/AndroidManifest.xml                                            change: <queries>
 core/readiness/src/test/kotlin/dev/setu/mobile/core/readiness/BatteryCheckTest.kt      new
 core/readiness/src/test/kotlin/dev/setu/mobile/core/readiness/oem/OemTest.kt           new
@@ -85,7 +85,15 @@ The vendor component names are best effort. Resolution is the safety net, so an 
 
 Don't use `QUERY_ALL_PACKAGES`.
 
-**`Readiness.kt`.** Add `BATTERY` to `Step` (append it after `NOTIFICATIONS`, so the order reads DEVELOPER_OPTIONS, WIRELESS_DEBUGGING, USB_TCPIP_ENDPOINT, NOTIFICATIONS, BATTERY, AGENT_REACHES_ADBD). Add a required parameter `battery: Tri` right after `notifications`, with no default. Both supported paths include `BATTERY`; `Unsupported` stays empty. `BATTERY: NO` counts as NO in `ready`, exactly like `NOTIFICATIONS`. Don't special-case it. Change nothing else in `readiness()`.
+**`Readiness.kt`.** Add `BATTERY` to `Step` (append it after `NOTIFICATIONS`, so the order reads DEVELOPER_OPTIONS, WIRELESS_DEBUGGING, USB_TCPIP_ENDPOINT, NOTIFICATIONS, BATTERY, AGENT_REACHES_ADBD). Group the four device checks so the function stays under detekt's `LongParameterList` threshold (6), which data classes are exempt from:
+
+```kotlin
+data class DeviceChecks(val developerOptions: Tri, val wirelessDebugging: Tri, val notifications: Tri, val battery: Tri)
+
+fun readiness(path: SetupPath, checks: DeviceChecks, state: ConnectionState): ReadinessReport
+```
+
+`DeviceChecks` has no defaults in production code. Both supported paths include `BATTERY`; `Unsupported` stays empty. `BATTERY: NO` counts as NO in `ready`, exactly like `NOTIFICATIONS`. Don't special-case it. The rules in `readiness()` are otherwise unchanged. Don't touch `config/detekt/detekt.yml`.
 
 OEM switches (autostart, Never sleeping apps, MIUI "No restrictions") can't be read, so they are **not** steps (AD-13).
 
@@ -107,7 +115,7 @@ Map each test to its acceptance ID in a comment. Use JUnit 4. Use Robolectric (`
   - **SAMSUNG with only the second BatteryActivity registered:** exactly that one vendor entry appears.
   - **System battery settings resolvable** (register an activity for the action): it appears with `vendorSpecific = false`, before `APP_DETAILS`.
 - **`ReadinessTest` (pure):**
-  - Update existing calls to pass `battery = Tri.YES` so their assertions are unchanged.
+  - Update existing calls to build `DeviceChecks` (a test-only helper with `battery = Tri.YES` is fine) so their assertions are unchanged.
   - Add these cases: both paths contain `BATTERY`; `battery = NO` gives `ready == false`; `battery = UNKNOWN` with everything else YES or UNKNOWN gives `ready == true`; `Unsupported` stays empty.
 
 If Robolectric cannot make an explicit component resolve after you register it, stop and report the exact behaviour in the PR. Don't change the production rule to suit the test.
