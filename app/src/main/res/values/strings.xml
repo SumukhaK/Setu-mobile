@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="hosting_channel_name">Remote debugging</string>
+    <string name="fgs_subtype">Hosts an encrypted remote ADB debugging session for a paired desktop</string>
+</resources>

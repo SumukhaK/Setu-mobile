@@ -57,6 +57,7 @@ kotlin {
 
 dependencies {
     implementation(project(":core:setu"))
+    implementation(libs.androidx.core.ktx)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.ui)
@@ -67,6 +68,4 @@ dependencies {
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
-
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
