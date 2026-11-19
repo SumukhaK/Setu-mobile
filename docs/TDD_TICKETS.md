@@ -6,6 +6,21 @@ Companion to the first architecture and UX audit against v1.0.1.
 
 > **Status in this repository.** The section 2 and section 3 baseline updates are applied in [Setu-Desktop `docs/JOURNEYS.md`](https://github.com/SumukhaK/Setu-Desktop/blob/main/docs/JOURNEYS.md) (canonical, including P01–P22) and in each repository's `docs/SCREENS.md`. The prototype fixture changes in section 2.7 are not applied yet. The same file lives in both Setu-Desktop and Setu-mobile.
 
+## Ticket status (Setu-mobile)
+
+Updated by the post-merge ritual. Desktop (DT-*) status is tracked in Setu-Desktop's copy of this file.
+
+- [ ] AT-01 · Project scaffold and SDK test seam
+- [ ] AT-02 · Hosting foreground service and notification
+- [ ] AT-03 · Readiness engine
+- [ ] AT-04 · Battery and OEM readiness, MIUI install recovery
+- [ ] AT-05 · Guided setup UI
+- [ ] AT-06 · Solo hosting screen
+- [ ] AT-07 · Connected desktops and End session
+- [ ] AT-08 · Debugger recovery and system pairing guidance
+- [ ] AT-09 · Managed devices (EMM)
+- [ ] AT-10 · Settings and device audit
+
 ---
 
 ## 0. Verdict
