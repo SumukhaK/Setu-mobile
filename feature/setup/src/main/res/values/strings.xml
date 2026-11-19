@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_path_wireless">Wireless debugging (Android 11+ on Wi-Fi)</string>
+    <string name="setup_path_usb">USB setup (Android 10 or no Wi-Fi)</string>
+    <string name="setup_path_unsupported">This phone can\'t use the USB fallback here. Contact IT or connect to a supported Wi-Fi network.</string>
+
+    <string name="setup_step_developer_options">Developer options</string>
+    <string name="setup_step_developer_options_body">Turn on Developer options under Settings, About phone: tap Build number seven times.</string>
+    <string name="setup_step_wireless_debugging">Wireless debugging</string>
+    <string name="setup_step_wireless_debugging_body">Open Wireless debugging and choose Pair device with pairing code. Android shows a six-digit code and a port: read them to the developer, who enters them on the desktop. Setu never asks for that code.</string>
+    <string name="setup_step_usb">USB connection</string>
+    <string name="setup_step_notifications">Notifications</string>
+    <string name="setup_step_notifications_body">Hosting still works without them, but you won\'t see its status.</string>
+    <string name="setup_step_battery">Battery optimisation</string>
+    <string name="setup_step_agent">Hosting connection</string>
+    <string name="setup_step_agent_body">Checked once hosting starts.</string>
+
+    <string name="setup_chip_done">Done</string>
+    <string name="setup_chip_needed">Needed</string>
+    <string name="setup_chip_not_checked">Not checked yet</string>
+
+    <string name="setup_action_open_settings">Open settings</string>
+    <string name="setup_action_open_developer_options">Open developer options</string>
+    <string name="setup_action_allow_notifications">Allow notifications</string>
+
+    <string name="setup_usb_step_connect">1. Connect USB to a trusted computer.</string>
+    <string name="setup_usb_step_allow">2. Allow USB debugging on the phone.</string>
+    <string name="setup_usb_step_tcpip">3. On the computer, run adb tcpip 5555.</string>
+    <string name="setup_usb_step_keep_cable">4. Keep the cable connected until Setu confirms.</string>
+    <string name="setup_usb_unplug_wait">Don\'t unplug yet: waiting for the phone to report 127.0.0.1:5555.</string>
+    <string name="setup_usb_unplug_ready">Setup confirmed. You can unplug the USB cable.</string>
+    <string name="setup_usb_caution">Use only trusted networks. Don\'t forward port 5555.</string>
+
+    <string name="setup_battery_state_yes">Setu is exempt from battery optimisation.</string>
+    <string name="setup_battery_state_no">Setu is optimised; the system may stop it in the background.</string>
+    <string name="setup_battery_state_unknown">The battery state could not be read.</string>
+    <string name="setup_battery_destination_autostart">Autostart settings</string>
+    <string name="setup_battery_destination_battery">Battery settings</string>
+    <string name="setup_battery_destination_app_details">App info</string>
+    <string name="setup_battery_vendor_suffix">(phone maker)</string>
+    <string name="setup_battery_note">Some phone makers add extra switches we can\'t check. Turn off restrictions for Setu if you see them.</string>
+
+    <string name="setup_miui_title">Install failed on a Xiaomi phone?</string>
+    <string name="setup_miui_body">If installing shows INSTALL_FAILED_USER_RESTRICTED, turn on Install via USB and USB debugging (Security settings) in Developer options, where IT allows it.</string>
+    <string name="setup_miui_action">Open developer options</string>
+</resources>
