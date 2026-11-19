@@ -58,7 +58,7 @@ dependencies {
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.compose.ui.test.junit4)
     // Declares the host ComponentActivity that createComposeRule launches under Robolectric.
-    testImplementation("androidx.compose.ui:ui-test-manifest")
+    testImplementation(libs.androidx.compose.ui.test.manifest)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
