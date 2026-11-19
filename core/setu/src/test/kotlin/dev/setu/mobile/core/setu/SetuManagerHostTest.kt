@@ -96,6 +96,29 @@ class SetuManagerHostTest {
         host.stop()
     }
 
+    // AT-02: session_open adds a live session; stop clears the list.
+    @Test
+    fun sessionsTrackSessionOpenAndClearOnStop() = runBlocking {
+        val launcher = FakeAgentLauncher()
+        val host = host(launcher)
+
+        host.start(SetuConfig(relayUrl = "wss://relay.test/"))
+        val agent = launcher.awaitLaunch()
+        agent.emit("""{"event":"online","device_id":"dev-1"}""")
+        agent.emit(
+            """{"event":"session_open","session_id":"a1","peer_label":"ci-laptop",""" +
+                """"transport":"relay-wss","kind":"adb"}""",
+        )
+
+        val sessions = withTimeout(5_000) { host.sessions.first { it.isNotEmpty() } }
+        assertEquals(1, sessions.size)
+        assertEquals("a1", sessions[0].id)
+        assertEquals("ci-laptop", sessions[0].peerLabel)
+
+        host.stop()
+        assertTrue(host.sessions.value.isEmpty())
+    }
+
     // Stop: the agent process is destroyed and the SDK reports Idle again.
     @Test
     fun stopDestroysTheAgentAndReturnsToIdle() = runBlocking {
