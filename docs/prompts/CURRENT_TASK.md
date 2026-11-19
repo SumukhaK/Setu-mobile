@@ -106,14 +106,16 @@ class SetupViewModel(
      - AGENT_REACHES_ADBD: no action. The text is "Checked once hosting starts."
   3. **`MiuiInstallHelp`**, only when `oem == Oem.XIAOMI`.
 - **`UsbBootstrapStep`.** It lists these steps:
-  1. Connect USB to an approved computer.
+  1. Connect USB to a trusted computer.
   2. Allow USB debugging on the phone.
   3. On the computer, run `adb tcpip 5555`.
   4. Keep the cable connected until Setu confirms.
 
   Below the steps, show "Don't unplug yet: waiting for the phone to report 127.0.0.1:5555." when `!canUnplugUsb`, and "Setup confirmed. You can unplug the USB cable." when it is true. Add a one-line caution: "Use only trusted networks. Don't forward port 5555."
 - **`BatteryStep`.** It shows the battery state. It lists one button per destination, labelled by purpose ("Autostart settings", "Battery settings", "App info") and suffixed with "(phone maker)" when `vendorSpecific`. It adds the note "Some phone makers add extra switches we can't check. Turn off restrictions for Setu if you see them." There is no confirm checkbox (AD-13).
-- **`MiuiInstallHelp`** is an expandable card titled "Install failed on a Xiaomi phone?". The body says that if installing shows `INSTALL_FAILED_USER_RESTRICTED`, the user should turn on **Install via USB** and **USB debugging (Security settings)** in Developer options where IT approves. It has an action to open developer options.
+- **`MiuiInstallHelp`** is an expandable card titled "Install failed on a Xiaomi phone?". The body says that if installing shows `INSTALL_FAILED_USER_RESTRICTED`, the user should turn on **Install via USB** and **USB debugging (Security settings)** in Developer options where IT allows it. It has an action to open developer options.
+
+**Copy rule.** No string in `feature/setup` may contain "approve", "approved" or "approval": P01's `MainActivityTest` forbids it on the first screen.
 
 **`MainActivity.kt`.** Keep the "Setu" title text and put `SetupScreen` under it. Build the VM with:
 
