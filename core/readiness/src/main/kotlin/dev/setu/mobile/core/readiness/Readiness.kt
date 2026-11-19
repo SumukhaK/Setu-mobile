@@ -46,8 +46,10 @@ private fun agentStep(state: ConnectionState): Tri = when {
 
 private fun usbEndpointStep(state: ConnectionState): Tri = when {
     state !is ConnectionState.Online -> Tri.UNKNOWN
+    state.warning?.contains("adbd_unreachable") == true -> Tri.NO
     state.adbdEndpoint == LOOPBACK_ENDPOINT -> Tri.YES
-    else -> Tri.NO
+    state.adbdEndpoint != null -> Tri.NO
+    else -> Tri.UNKNOWN
 }
 
 private const val LOOPBACK_ENDPOINT = "127.0.0.1:5555"
