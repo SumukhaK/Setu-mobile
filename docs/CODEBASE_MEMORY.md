@@ -2,7 +2,7 @@
 
 Read this first. It replaces a repo scan. Keep it under 150 lines; update it in every post-merge ritual.
 
-Last updated: 2026-11-19 · main @ `c3e0674` (AT-02 merged, AT-03 prompt issued) · SDK baseline: Setu-SDK v1.1.0 (`SumukhaK/Setu` tag `v1.1.0`, commit `921aded`)
+Last updated: 2026-11-19 · main @ `4f5af79` (AT-03 merged, AT-04 prompt issued) · SDK baseline: Setu-SDK v1.1.0 (`SumukhaK/Setu` tag `v1.1.0`, commit `921aded`)
 
 ## Pipeline
 
@@ -36,6 +36,10 @@ app/                            :app, namespace dev.setu.mobile
 core/setu/                      :core:setu, namespace dev.setu.mobile.core.setu
   src/main/.../SetuHost.kt, SetuManagerHost.kt      SDK seam
   src/test/.../FakeAgentLauncher.kt, FakePolicyProvider.kt, SetuManagerHostTest.kt
+core/readiness/                 :core:readiness, namespace dev.setu.mobile.core.readiness (deps :core:setu; :app not wired until AT-05)
+  src/main/.../SetupPath.kt, SetupPathDetector.kt (+NetworkReader), Readiness.kt   pure domain
+  src/main/.../DeveloperOptionsCheck.kt, WirelessDebuggingCheck.kt, NotificationCheck.kt, RecheckOnResume.kt
+  src/main/AndroidManifest.xml  ACCESS_NETWORK_STATE
 index.html prototype.*          browser wireframe prototype (not app code)
 docs/                           SCREENS, TDD_TICKETS (AT tracker), CODEBASE_MEMORY, prompts/
 ```
@@ -47,6 +51,9 @@ docs/                           SCREENS, TDD_TICKETS (AT tracker), CODEBASE_MEMO
 - `HostingNotification.build(context, NotificationContent)`, `ensureChannel(context)`, `NOTIFICATION_ID = 1`, `CHANNEL_ID = "hosting"`.
 - App test double: `FakeSetuHost` (MutableStateFlows, `calls`, `starts`, `stopCount`, `startError`). Service tests subclass `HostingService` and override `createHost()`.
 - `SetuManagerHost(manager: SetuManager) : SetuHost`: delegation only.
+- Readiness (AT-03, pure): `enum Tri { YES, NO, UNKNOWN }`; `SetupPath` = `WirelessDebugging | UsbTcpip | Unsupported(Reason.USB_FALLBACK_FORBIDDEN)`; `detectSetupPath(sdkInt, onWifi, usbFallbackAllowed)`; `readiness(path, developerOptions, wirelessDebugging, notifications, state): ReadinessReport(path, steps: Map<Step, Tri>)` with `ready` = supported path and no step NO. `Step` = DEVELOPER_OPTIONS, WIRELESS_DEBUGGING, USB_TCPIP_ENDPOINT, NOTIFICATIONS, AGENT_REACHES_ADBD.
+- SDK evidence rules: `adbd_unreachable` warning → NO (wins over any endpoint); endpoint → YES; Online without either → UNKNOWN; non-Online → UNKNOWN. USB step YES only for `127.0.0.1:5555`. Agent YES overrides the wireless setting.
+- Readers (thin, Context-taking): `NetworkReader.onWifi()`, `DeveloperOptionsCheck.enabled()` (missing → NO), `WirelessDebuggingCheck.enabled()` (`adb_wifi_enabled`, UNKNOWN if missing or < API 30), `NotificationCheck.granted()`. `RecheckOnResume(onRecheck): DefaultLifecycleObserver`.
 - Test seam (core/setu test source set): `FakeAgentLauncher` (`awaitLaunch()`, `launches`, `launchCount`), `FakeAgentProcess` (`emit(json)`, `exit(code)`, `destroyed`), `FakePolicyProvider(policy)`. Real manager: `SetuManager.Builder(ctx).agentLauncher().policyProvider().networkInfoProvider { emptyList() }.stateDir(tmp).scope(realScope).build()`.
 
 ## Wired SDK v1.1.0 bindings
@@ -58,6 +65,7 @@ docs/                           SCREENS, TDD_TICKETS (AT tracker), CODEBASE_MEMO
 | `sessions`, `refreshPolicy()`, `start(null)` | `SetuManagerHost`, `HostingService` | AT-02 |
 | `SetuManager.initialize`, `SetuNotifications.content(...).publicText` | `HostingService`, `HostingNotification` | AT-02 |
 | `ACTION_APPLICATION_RESTRICTIONS_CHANGED` | `HostingService` receiver | AT-02 |
+| `ConnectionState.Online.adbdEndpoint`, `.warning` (`adbd_unreachable`) | `readiness()` | AT-03 |
 
 The SDK's permissions (INTERNET, network/wifi state, multicast) come in through the AAR manifest merge.
 
@@ -75,6 +83,7 @@ The SDK's permissions (INTERNET, network/wifi state, multicast) come in through 
 - AD-10 (AT-02): App tests that need SDK state use a `FakeSetuHost` (MutableStateFlows) in `app/src/test`. Only `:core:setu` tests run the real SDK with the fake agent.
 - AD-11 (AT-02): `startForeground(..., ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST)`, not `..._SPECIAL_USE` (API 34 constant trips lint at minSdk 29). The manifest declares `specialUse`, so behaviour is identical.
 - AD-12 (AT-03): No SDK or policy field controls the USB fallback. Readiness takes `usbFallbackAllowed: Boolean` as an input (default true). AT-09 supplies it from an app EMM restriction (`allow_usb_fallback`, default true).
+- AD-13 (AT-04): `:core:readiness` has no UI. The MIUI install-recovery sheet moves to AT-05; AT-04 only detects `Oem.XIAOMI`. OEM switches (autostart, Never sleeping apps) can't be read, so they are not readiness steps: AT-05 shows them as tester-confirmed. Only `Step.BATTERY` (from `isIgnoringBatteryOptimizations`) joins the report. Vendor intents are offered only when they resolve; app details is always the last fallback. Never use `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`.
 
 ## Completed tickets
 
@@ -82,12 +91,14 @@ The SDK's permissions (INTERNET, network/wifi state, multicast) come in through 
 | --- | --- | --- |
 | AT-01 | [#4](https://github.com/SumukhaK/Setu-mobile/pull/4) | Gradle scaffold, vendored SDK 1.1.0, `SetuHost` seam, fake agent, P01 domain + UI tests |
 | AT-02 | [#6](https://github.com/SumukhaK/Setu-mobile/pull/6) | HostingService + lock-screen-safe notification, EMM receiver, P06/P17 tests (14 tests total) |
+| AT-03 | [#8](https://github.com/SumukhaK/Setu-mobile/pull/8) | `:core:readiness`: P04 branch table, readiness report from SDK evidence, platform checks (23 tests; 1 review round on the USB endpoint rule) |
 
 ## Open items
 
-- Active ticket: AT-03 · Readiness engine (prompt issued 2026-11-19).
+- Active ticket: AT-04 · Battery and OEM readiness (prompt issued 2026-11-19).
 - Relay URL for solo: a service start extra with no persistence (AT-02). Settings storage arrives in AT-10. Managed `relay_url` takes precedence (SDK).
-- Merged branches `feature/AT-01-scaffold-sdk-seam` and `feature/AT-02-hosting-service` couldn't be deleted from Claude's session. Delete it on GitHub, or turn on "Automatically delete head branches".
+- Merged branches `feature/AT-01-scaffold-sdk-seam`, `feature/AT-02-hosting-service` and `feature/AT-03-readiness-engine` couldn't be deleted from Claude's session. Delete them on GitHub, or turn on "Automatically delete head branches".
 - SDK v1.1.1 asks: TDD_TICKETS.md §7 (peer_user/peer_fingerprint, solo trustedDesktops/revokeDesktop).
 - Device lab gate (§7) before default-on Android 11+ pairing.
 - `HostingNotificationTest` uses deprecated `Bundle.get` (compile warning only). Replace when that file is next touched.
+- `NetworkReaderTest` uses deprecated `NetworkInfo` shadows (compile warnings only). Leave unless the file is touched.
