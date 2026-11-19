@@ -82,6 +82,39 @@ class ReadinessTest {
         assertFalse(wrongPort.ready)
     }
 
+    // P04: the adbd_unreachable warning wins over a loopback endpoint.
+    @Test
+    fun p04UsbEndpointWithUnreachableWarningIsNotReady() {
+        val report = readiness(
+            path = SetupPath.UsbTcpip,
+            developerOptions = Tri.YES,
+            wirelessDebugging = Tri.UNKNOWN,
+            notifications = Tri.YES,
+            state = ConnectionState.Online(
+                deviceId = "dev-1",
+                adbdEndpoint = "127.0.0.1:5555",
+                warning = "adbd_unreachable: wireless off",
+            ),
+        )
+
+        assertEquals(Tri.NO, report.steps[Step.USB_TCPIP_ENDPOINT])
+        assertFalse(report.ready)
+    }
+
+    // P04: Online without an endpoint or a warning says nothing about the USB bootstrap.
+    @Test
+    fun p04UsbEndpointWithoutEndpointIsUnknown() {
+        val report = readiness(
+            path = SetupPath.UsbTcpip,
+            developerOptions = Tri.YES,
+            wirelessDebugging = Tri.UNKNOWN,
+            notifications = Tri.YES,
+            state = ConnectionState.Online(deviceId = "dev-1"),
+        )
+
+        assertEquals(Tri.UNKNOWN, report.steps[Step.USB_TCPIP_ENDPOINT])
+    }
+
     // P04: Idle leaves the SDK-backed steps unknown without blocking the rest.
     @Test
     fun p04IdleLeavesSdkStepsUnknown() {
