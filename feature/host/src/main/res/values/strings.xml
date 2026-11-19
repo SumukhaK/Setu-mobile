@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="host_status_idle">Not hosting</string>
+    <string name="host_status_starting">Starting…</string>
+    <string name="host_status_online">Hosting</string>
+    <string name="host_status_reconnecting">Reconnecting…</string>
+    <string name="host_status_blocked">Blocked by policy</string>
+    <string name="host_status_policy_missing">Waiting for IT setup</string>
+
+    <string name="host_device_id">Device ID: %1$s</string>
+    <string name="host_code_label">Setu code: read it to the developer</string>
+    <string name="host_warning">Hosting warning: %1$s</string>
+
+    <string name="host_no_relay">No relay is configured in this build.</string>
+    <string name="host_pair_failed">Couldn\'t get a new code. Try again.</string>
+    <string name="host_retry_in">Retrying in %1$d s</string>
+
+    <string name="host_start">Start hosting</string>
+    <string name="host_new_code">New code</string>
+    <string name="host_stop">Stop hosting</string>
+</resources>

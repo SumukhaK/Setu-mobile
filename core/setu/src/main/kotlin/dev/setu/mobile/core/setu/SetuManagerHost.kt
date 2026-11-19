@@ -17,5 +17,7 @@ class SetuManagerHost(private val manager: SetuManager) : SetuHost {
 
     override fun stop() = manager.stop()
 
+    override suspend fun pair(timeoutMs: Long): String = manager.pair(timeoutMs)
+
     override fun refreshPolicy(): PolicyStatus = manager.refreshPolicy()
 }

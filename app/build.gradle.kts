@@ -16,10 +16,16 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+        buildConfigField(
+            "String",
+            "SETU_RELAY_URL",
+            "\"${providers.gradleProperty("setu.relayUrl").getOrElse("")}\"",
+        )
     }
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     compileOptions {
@@ -58,6 +64,7 @@ kotlin {
 dependencies {
     implementation(project(":core:setu"))
     implementation(project(":feature:setup"))
+    implementation(project(":feature:host"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(platform(libs.androidx.compose.bom))

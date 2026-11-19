@@ -42,6 +42,7 @@ open class HostingService : Service() {
     override fun onCreate() {
         super.onCreate()
         host = createHost()
+        HostingRegistry.attach(host)
         HostingNotification.ensureChannel(this)
         ContextCompat.registerReceiver(
             this,
@@ -75,6 +76,7 @@ open class HostingService : Service() {
 
     override fun onDestroy() {
         host.stop()
+        HostingRegistry.detach(host)
         unregisterReceiver(restrictionsReceiver)
         scope.cancel()
         stopForeground(STOP_FOREGROUND_REMOVE)

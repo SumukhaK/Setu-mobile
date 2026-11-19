@@ -20,5 +20,8 @@ interface SetuHost {
 
     fun stop()
 
+    /** Asks the agent for a fresh code; the returned string is not displayed. */
+    suspend fun pair(timeoutMs: Long = 30_000): String
+
     fun refreshPolicy(): PolicyStatus
 }
