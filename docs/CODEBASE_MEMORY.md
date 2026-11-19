@@ -2,12 +2,12 @@
 
 Read this first. It replaces a repo scan. Keep it under 150 lines; update it in every post-merge ritual.
 
-Last updated: 2026-11-19 · main @ bootstrap (pre AT-01) · SDK baseline: Setu-SDK v1.1.0 (`SumukhaK/Setu` tag `v1.1.0`, commit `921aded`)
+Last updated: 2026-11-19 · main @ AT-01 prompt issued · SDK baseline: Setu-SDK v1.1.0 (`SumukhaK/Setu` tag `v1.1.0`, commit `921aded`)
 
 ## Pipeline
 
 - Architect/reviewer: Claude. Builders: one ticket per PR from `docs/TDD_TICKETS.md`, branch from latest `main`.
-- Builder prompts are issued in Setu-Desktop `docs/prompts/CURRENT_TASK.md` while desktop tickets run; an Android ticket gets its own `docs/prompts/CURRENT_TASK.md` here when issued.
+- Active builder prompt: `docs/prompts/CURRENT_TASK.md` (Android ticket). Desktop runs in parallel with its own prompt. Review fixes: `docs/REVIEW_FIX_PROMPT.md`.
 - Acceptance tests: Setu-Desktop `docs/JOURNEYS.md` P01–P22 (canonical for both apps). Screens: `docs/SCREENS.md` here.
 - SDK contract: https://github.com/SumukhaK/Setu/blob/v1.1.0/API_SPEC.md (§4 Android SDK, §4.4 notifications, §1.5 events).
 
@@ -49,6 +49,10 @@ No application code exists yet. The Gradle project arrives with AT-01.
 - AD-2: Notifications use `SetuNotifications.content(...).publicText` for both variants; `text` is never posted (P06).
 - AD-3: `peer_label` is shown as "Computer name (unverified)" until the SDK exposes a verified subject (P22).
 - AD-4: Never cache the unscoped corporate policy JSON (P07).
+- AD-5 (AT-01): The SDK is not on Maven. The official 1.1.0 AAR is vendored at `third_party/setu-android/` (tag, commit, sha256 in its README) and consumed with `api(files(...))` from `:core:setu`, plus an explicit `kotlinx-coroutines-android` 1.10.2 (a file AAR has no POM).
+- AD-6 (AT-01): applicationId and namespace `dev.setu.mobile`; modules `dev.setu.mobile.core.<name>`, `dev.setu.mobile.feature.<name>`.
+- AD-7 (AT-01): `SetuHost` (in `:core:setu`) is the only seam to the SDK and exposes SDK model types directly. Add domain models and mappers only when a feature needs them.
+- AD-8: Toolchain matches the SDK (AGP 8.9.3, Kotlin 2.1.21, JVM 17, compileSdk 35). No detekt or lint baselines and no `@Suppress` to get green.
 
 ## Completed tickets
 
@@ -58,7 +62,8 @@ No application code exists yet. The Gradle project arrives with AT-01.
 
 ## Open items
 
-- Next Android ticket: AT-01 · Project scaffold and SDK test seam (not issued yet; desktop DT-01 runs first).
-- AAR distribution: confirm the Maven repo/coordinates that serve `setu-android:1.1.0` before AT-01 starts.
+- Active ticket: AT-01 · Project scaffold and SDK test seam (prompt issued 2026-11-19).
+- AAR distribution: vendored for now (AD-5). Revisit if the SDK gets a Maven or GitHub Packages publication.
+- No CI yet. Builders paste local gate output into the PR.
 - SDK v1.1.1 asks: TDD_TICKETS.md §7 (peer_user/peer_fingerprint, solo trustedDesktops/revokeDesktop).
 - Device lab gate (§7) before default-on Android 11+ pairing.
