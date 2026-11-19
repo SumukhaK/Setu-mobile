@@ -1,20 +1,14 @@
 "use strict";
 
 const device = document.querySelector("#device");
-const directions = document.querySelector("#directions");
-const scenarioSelect = document.querySelector("#scenario");
+const scenarios = document.querySelector("#scenario");
 const announce = document.querySelector("#announce");
-const themes = {
-  relay: { name: "Relay", detail: "A familiar Android checklist", icon: "layers" },
-  signal: { name: "Signal", detail: "A status-first control panel", icon: "pulse" },
-  field: { name: "Field", detail: "Guided tester handoff", icon: "steps" },
-};
+const reviewControls = document.querySelector("#scenario-actions");
+const org = "Northstar QA";
+const demoDeviceId = () => state.managed ? "qa-pixel8a-07" : "pixel-8a-casey";
+const demoCode = (generation) => `4821-${String(512903 + generation * 137).padStart(6, "0").slice(-6)}`;
 const icons = {
   logo: '<path d="M3 15c4 0 5-7 9-7s5 7 9 7M3 19c4 0 5-7 9-7s5 7 9 7M3 11c4 0 5-7 9-7s5 7 9 7"/>',
-  layers: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 14h16M9 17h6"/>',
-  pulse: '<path d="M2 12h4l3-7 5 14 3-7h5"/>',
-  steps: '<path d="M4 19h5v-5h5V9h6M16 5h4v4"/>',
-  down: '<path d="m6 9 6 6 6-6"/>',
   next: '<path d="m9 6 6 6-6 6"/>',
   arrow: '<path d="M4 12h15m-6-6 6 6-6 6"/>',
   phone: '<rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10 6h4m-3 12h2"/>',
@@ -28,22 +22,15 @@ const icons = {
   lock: '<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 4v3"/>',
   shield: '<path d="M12 22c-5-2.5-8-6.5-8-11V6l8-4 8 4v5c0 4.5-3 8.5-8 11Z"/><path d="m9 12 2 2 4-4"/>',
   building: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 7h.1m5.9 0h.1M9 11h.1m5.9 0h.1M9 15h.1m5.9 0h.1M11 21v-3h2v3"/>',
-  photo: '<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="8.5" cy="9" r="1.5"/><path d="m3 17 5-4 4 3 5-6 4 5"/>',
-  user: '<circle cx="12" cy="8" r="3.5"/><path d="M4 21v-1.5c0-3 3.5-5 8-5s8 2 8 5V21"/>',
   link: '<path d="m10 14 4-4m-6 6-1 1a3.5 3.5 0 0 1-5-5l4-4a3.5 3.5 0 0 1 5 0m5 0 1-1a3.5 3.5 0 0 1 5 5l-4 4a3.5 3.5 0 0 1-5 0"/>',
   refresh: '<path d="M20 8a8 8 0 1 0 .5 7M20 3v5h-5"/>',
-  video: '<rect x="3" y="5" width="12" height="14" rx="2"/><path d="m15 10 6-4v12l-6-4"/>',
-  import: '<path d="M12 3v12m-4-4 4 4 4-4M4 15v5h16v-5"/>',
-  share: '<circle cx="5" cy="12" r="2"/><circle cx="18" cy="5" r="2"/><circle cx="18" cy="19" r="2"/><path d="m7 11 9-5m-9 7 9 5"/>',
   more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
   bell: '<path d="M18 8a6 6 0 1 0-12 0c0 7-2 7-2 9h16c0-2-2-2-2-9m-8 12a2 2 0 0 0 4 0"/>',
   close: '<path d="m6 6 12 12M18 6 6 18"/>',
   stop: '<rect x="5" y="5" width="14" height="14" rx="2"/>',
-  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8h.01"/>',
-  mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
-  play: '<path d="m8 5 12 7-12 7Z"/>',
   home: '<path d="m3 10 9-7 9 7v10H3z"/><path d="M9 20v-6h6v6"/>',
+  pulse: '<path d="M2 12h4l3-7 5 14 3-7h5"/>',
 };
 
 function icon(name) {
@@ -52,47 +39,66 @@ function icon(name) {
 
 const logo = `<span class="logo">${icon("logo")}</span><span>Setu</span>`;
 document.querySelector("#review-product").innerHTML = logo;
+const scenarioOptions = [...scenarios.options].map(({ value, textContent }) => [value, textContent]);
 
-function initialState(theme = "relay") {
+function defaultState(scenario) {
   return {
-    theme, signedIn: true, auth: "signup", email: "jae@example.test", verification: false,
-    verificationEnds: 0, resendAfter: 0, authError: "", screen: "device",
-    workspace: "solo", managed: false, enrolled: false, enrollmentRequested: false, policyBlocked: false,
-    developer: false, wireless: false, usb: false, wifi: true, taps: 0,
-    phoneDeveloper: false, phoneWireless: false, phoneUsb: false, phoneWifi: true,
-    hosting: false, code: "", codeEnds: 0, session: "idle", connectedAt: 0, reconnectEnds: 0,
-    desktopAttached: false, background: false, trusted: true, history: [], sheet: null,
-    docs: [], selected: null, capture: null, captureScope: "", recordingAt: 0, protectedContent: false,
-    notice: null, scenario: "setup",
+    scenario, screen: "device", sheet: "", settingsPage: "",
+    model: "Pixel 8a", oem: "Pixel", android: 15, network: "wifi",
+    developer: false, wireless: false, usb: false, usbAuthorized: false, usbThisBoot: false, legacyAllowed: false,
+    battery: "unreviewed", notification: "unrequested", taps: 0, fgsBackground: false, locked: false,
+    managed: false, token: false, policy: false, blocked: false, ack: false, queuedPolicy: "",
+    host: "idle", adbdWarning: false, failedAttempts: 0, codeGeneration: 0,
+    installError: false, usbInstall: false, usbSecurity: false, nextGuide: "", notice: null,
   };
 }
 
-let state = initialState();
-let settlementTimer;
-const soloPeer = "Morgan Lee";
-const peer = () => state.workspace === "corporate" ? "Riley Park" : soloPeer;
-const org = "Northstar QA";
-const hostName = "Pixel 8a";
-const isActive = () => ["connected", "reconnecting", "offline"].includes(state.session);
-const ready = () => state.developer && state.wireless && state.wifi && !state.policyBlocked;
-const permitted = () => state.workspace === "solo" ? !state.managed : state.enrolled && !state.policyBlocked;
-const elapsed = (stamp) => Math.max(0, Math.floor((Date.now() - stamp) / 1000));
-const secondsLeft = (stamp) => Math.max(0, Math.ceil((stamp - Date.now()) / 1000));
-const clock = (secs) => `${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`;
-const esc = (value = "") => String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+let state = defaultState("setup");
+let startTimer;
+let sheetOpener = "";
+
+function path() {
+  return state.android >= 11 && state.network === "wifi" ? "wireless" : "usb";
+}
+
+function readyForHost() {
+  return state.developer && (path() === "wireless" ? state.wireless : state.legacyAllowed && state.usb && state.usbAuthorized && state.usbThisBoot);
+}
+
+function gate() {
+  if (state.blocked) return "blocked";
+  if (state.managed && state.token && !state.ack) return "transition";
+  if (state.managed && (!state.token || !state.policy)) return "missing";
+  return "";
+}
+
+function nextStep() {
+  if (path() === "usb" && !state.legacyAllowed) return "legacy-restricted";
+  if (!state.developer) return "developer";
+  if (path() === "wireless" && !state.wireless) return "wireless";
+  if (path() === "usb" && (!state.usb || !state.usbAuthorized || !state.usbThisBoot)) return "usb";
+  if (state.battery === "unreviewed") return "battery";
+  if (state.android >= 13 && state.notification === "unrequested") return "permission";
+  return "";
+}
+
+const active = () => state.host !== "idle";
+const mode = () => state.managed ? "Corporate" : "Solo";
+const pathLabel = () => path() === "wireless" ? "Wireless debugging" : "USB bootstrap";
+const notificationVisible = () => active() && state.notification === "allowed" && !state.locked;
+const relatedEndpoint = () => path() === "wireless" ? "192.0.2.24:37821" : "127.0.0.1:5555";
 
 function button(label, action, tone = "secondary", symbol = "", attributes = "") {
   return `<button type="button" class="button ${tone}" data-action="${action}" ${attributes}>${symbol ? icon(symbol) : ""}${label}</button>`;
 }
 
-function iconButton(label, action, symbol, extra = "") {
-  return `<button type="button" class="icon-button ${extra}" data-action="${action}" aria-label="${label}" title="${label}">${icon(symbol)}</button>`;
+function iconButton(label, action, symbol) {
+  return `<button class="icon-button" type="button" data-action="${action}" aria-label="${label}" title="${label}">${icon(symbol)}</button>`;
 }
 
-function row(title, detail, symbol, action = "", tone = "", attributes = "") {
+function row(title, detail, symbol, action = "", tone = "") {
   const copy = `<span class="row-icon ${tone}">${icon(symbol)}</span><span class="row-copy"><strong>${title}</strong><small>${detail}</small></span>`;
-  return action
-    ? `<button type="button" class="row" data-action="${action}" ${attributes}>${copy}${icon("next")}</button>`
+  return action ? `<button type="button" class="row" data-action="${action}">${copy}${icon("next")}</button>`
     : `<div class="row">${copy}</div>`;
 }
 
@@ -104,354 +110,315 @@ const panel = (contents, extra = "") => `<div class="panel ${extra}">${contents}
 const notice = (message, type = "") => `<div class="notice ${type}">${icon(type === "success" ? "check" : "info")}<span>${message}</span></div>`;
 const tag = (label, tone = "", symbol = "") => `<span class="tag ${tone}">${symbol ? icon(symbol) : ""}${label}</span>`;
 const section = (label, sub = "") => `<div class="section-head"><h2>${label}</h2>${sub ? `<span>${sub}</span>` : ""}</div>`;
-const heading = (title, description = "", label = "") => `<div class="screen-head">${label ? `<div class="overline">${label}</div>` : ""}<h1 tabindex="-1">${title}</h1>${description ? `<p class="lede">${description}</p>` : ""}</div>`;
+const heading = (title, detail = "", label = "") => `<div class="screen-head">${label ? `<div class="overline">${label}</div>` : ""}<h1 tabindex="-1">${title}</h1>${detail ? `<p class="lede">${detail}</p>` : ""}</div>`;
 const metadata = (...pairs) => `<dl class="meta">${pairs.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join("")}</dl>`;
 
-function directionButtons() {
-  return Object.entries(themes).map(([key, { name, detail, icon: symbol }]) =>
-    `<button class="direction" type="button" data-direction="${key}" aria-pressed="${state.theme === key}">
-      <span class="swatch">${icon(symbol)}</span><span><strong>${name}</strong><small>${detail}</small></span>${state.theme === key ? icon("check") : ""}
-    </button>`).join("");
-}
-
 function topbar() {
-  const corporate = state.workspace === "corporate";
-  const label = corporate ? "Corporate" : "Solo";
-  return `<div class="statusbar" aria-hidden="true"><span>9:41</span><span>${icon("wifi")}${icon("cell")}${icon("battery")}</span></div>
-  <header class="topbar"><div class="brand">${logo}</div><div class="top-actions">
-    ${state.signedIn ? `<button class="workspace-pill" type="button" data-action="workspace" aria-label="Workspace, ${label}">${icon(corporate ? "building" : "user")}${label}${icon("down")}</button>` : ""}
-    ${state.hosting ? iconButton("Ongoing notification", "notification", "bell") : ""}
-    ${iconButton("Prototype options", "review", "more", "mobile-review")}
-  </div></header>`;
+  return `<div class="statusbar" aria-hidden="true"><span>9:41</span><span>${icon(state.network === "wifi" ? "wifi" : "cell")}${icon("cell")}${icon("battery")}</span></div>
+    <header class="topbar"><div class="brand">${logo}</div><div class="top-actions">
+      ${state.fgsBackground ? "" : `<span class="mode-label">${icon(state.managed ? "building" : "phone")}${mode()}</span>`}
+      ${notificationVisible() && !state.fgsBackground ? iconButton("Open foreground notification", "open-notification", "bell") : ""}
+      ${iconButton("Prototype options", "review", "more")}
+    </div></header>`;
 }
 
 function nav() {
-  const labels = {
-    relay: ["Device", "Evidence", "Profile"],
-    signal: ["Host", "Media", "Profile"],
-    field: ["Guide", "Evidence", "Profile"],
-  }[state.theme];
-  const links = [["device", "phone"], ["evidence", "photo"], ["profile", "user"]];
-  return `<nav class="navigation" aria-label="Setu">${links.map(([link, symbol], index) => `<button type="button"
-    data-action="nav-${link}" ${state.screen === link || (link === "evidence" && state.screen === "detail") ? 'aria-current="page"' : ""}><span>${icon(symbol)}</span>${labels[index]}</button>`).join("")}</nav>`;
+  const links = [["device", "phone", "Device"], ["settings", "settings", "Settings"]];
+  return `<nav class="navigation" aria-label="Setu">${links.map(([key, symbol, label]) => `<button type="button"
+    data-action="nav-${key}" ${state.screen === key ? 'aria-current="page"' : ""}><span>${icon(symbol)}</span>${label}</button>`).join("")}</nav>`;
 }
 
-function authView() {
-  if (state.verification) {
-    return heading("Check your email", `Enter the six-digit sign-in code for ${esc(state.email)}.`, "Account verification")
-      + `<form class="form" data-form="verify">
-        <label for="email-code">Email verification code<input id="email-code" class="input" type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" aria-describedby="demo-code" required></label>
-        ${state.authError ? notice(state.authError, "error") : ""}
-        <p class="demo-note" id="demo-code">Demo code <strong>482619</strong></p>
-        <button class="button primary wide" type="submit">Verify email</button>
-      </form>` + actions(button("Edit email", "edit-email", "ghost"), button("Resend code", "resend", "ghost", "", 'id="resend"'));
+function progressMark(current) {
+  return `<ol class="field-steps" aria-label="Device setup progress">${["Prepare", "Debugger", "Host"].map((label, index) =>
+    `<li ${index === current ? 'aria-current="step"' : index < current ? 'class="past"' : ""}>${label}</li>`).join("")}</ol>`;
+}
+
+function deviceCard(status, symbol = "phone") {
+  return `<section class="hero">${art(symbol)}${tag(status)}<h2>${state.model}</h2><p>Android ${state.android} · ${state.network === "wifi" ? "Wi-Fi connected" : "Cellular only"}</p></section>`;
+}
+
+function taskDetails(step) {
+  const tasks = {
+    developer: ["Turn on Developer options", "On this phone, tap Build number seven times in Android Settings."],
+    wireless: ["Enable Wireless debugging", "On Wi-Fi, open Developer options and switch on Wireless debugging."],
+    usb: ["Prepare ADB over USB", "Use an authorized local lab workstation for the one-per-boot USB setup."],
+    battery: ["Check battery restrictions", "Review this phone’s battery settings so hosting can continue in the background."],
+    permission: ["Allow hosting notifications", "Android asks whether Setu can show an ongoing notice while hosting."],
+    "legacy-restricted": ["This phone needs a trusted lab", "USB bootstrap requires an approved, isolated lab setup and OEM support. Use Wi-Fi on Android 11 or later when available."],
+  };
+  return tasks[step];
+}
+
+function setupView() {
+  const step = nextStep();
+  const ready = !step;
+  const [title, description] = taskDetails(step) || ["Start hosting", "Start the device agent when the desktop is ready to connect."];
+  const stage = ready ? 2 : state.developer && ["wireless", "usb", "legacy-restricted"].includes(step) ? 1 : readyForHost() ? 2 : 0;
+  return progressMark(stage)
+    + heading(ready ? "Ready to host" : "Get your phone ready", ready ? "Check the setup then start the device agent." : "The setup guide follows your Android version and network.")
+    + deviceCard(pathLabel(), path() === "wireless" ? "wifi" : "usb")
+    + section("Your next step", ready ? "" : stage === 1 ? "Debugger" : "Readiness")
+    + panel(`<h2>${title}</h2><p class="lede">${description}</p>${ready
+      ? button("Start Hosting", "start-hosting", "primary wide", "link")
+      : button(step === "legacy-restricted" ? "See lab requirements" : "Continue setup", "continue-setup", "primary wide", "arrow")}`, "field-task")
+    + stack(rows(row("All readiness checks", "Developer options, transport and background hosting", "settings", "checks")));
+}
+
+function managementView(kind) {
+  if (kind === "transition") {
+    return heading("Your organization now manages this device", `${org} sent an enrollment token through Android device management.`, "Corporate enrollment")
+      + deviceCard("Organization managed", "shield")
+      + stack(panel('<h2>How access works</h2><p class="lede">Your organization controls which developers can connect. Start hosting again after reviewing the policy. Corporate mode uses device grants.</p>'),
+        button("I understand", "acknowledge-management", "primary wide", "check"));
   }
-  return `<section class="hero auth-hero">${art("phone")}<div class="overline">Setu for Android</div>
-    <h1 tabindex="-1">Debug together.</h1><p>Prepare this phone, then approve who can connect.</p></section>
-    ${actions(...["signup", "login"].map(mode => `<button type="button" data-action="auth-${mode}" aria-pressed="${state.auth === mode}">${mode === "signup" ? "Create account" : "Sign in"}</button>`)).replace('class="actions"', 'class="actions auth-tabs"')}
-    <form class="form" data-form="email">
-      <label for="email">Email address<input id="email" class="input" name="email" type="email" autocomplete="email" required placeholder="you@example.com" value="${esc(state.email)}"></label>
-      ${state.authError ? notice(state.authError, "error") : ""}
-      <button class="button primary wide" type="submit">${state.auth === "signup" ? "Create account with email" : "Continue with email"}</button>
-      <p class="demo-note">The prototype displays a demo verification code.</p>
-    </form>`;
-}
-
-function setupRows() {
-  return rows(
-    row("Wi-Fi", state.wifi ? "Connected to Studio Wi-Fi" : "Disconnected", state.wifi ? "check" : "wifi", "guide-wifi", state.wifi ? "good" : "warn"),
-    row("Developer options", state.developer ? "Enabled" : "Required · Tap Build number seven times", state.developer ? "check" : "code", "guide-developer", state.developer ? "good" : "warn"),
-    row("Wireless debugging", state.wireless ? "Enabled" : "Required for wireless hosting", state.wireless ? "check" : "wifi", "guide-wireless", state.wireless ? "good" : "warn"),
-    row("USB debugging", state.usb ? "Enabled · Optional" : "Optional · For USB workflows", "usb", "guide-usb"),
-  );
-}
-
-function mainAction() {
-  if (!permitted()) return button("Review enrollment", "enrollment", "primary wide", "shield");
-  if (state.hosting) return "";
-  if (ready()) return button("Start hosting", "start-host", "primary wide", "link");
-  return button("Continue setup", nextSetup(), "primary wide", "arrow");
-}
-
-function nextSetup() {
-  if (state.policyBlocked) return "guide-wireless";
-  if (!state.wifi) return "guide-wifi";
-  if (!state.developer) return "guide-developer";
-  return "guide-wireless";
-}
-
-function progress() {
-  return Number(state.developer) + Number(state.wireless) + Number(state.wifi);
-}
-
-function connectionLabel() {
-  const sessionLabels = { request: "Approval needed", connected: "Session active", reconnecting: "Reconnecting", offline: "Connection lost" };
-  if (sessionLabels[state.session]) return sessionLabels[state.session];
-  if (state.hosting) return "Hosting";
-  if (state.policyBlocked) return "Restricted";
-  if (!permitted()) return "Enrollment needed";
-  return ready() ? "Ready to host" : "Setup needed";
-}
-
-function sessionContent() {
-  if (state.session === "request") {
-    return panel(`<h2>${peer()} wants to connect</h2><p class="lede">Approve remote debugging from their laptop.</p>
-      ${stack(metadata(["Requester", peer()], ["Device", "Developer laptop"], ["Access", "Debug this phone"]),
-      actions(button("Decline", "decline", "secondary"), button("Approve request", "approve", "primary", "check")),
-      button("Stop hosting", "stop-hosting", "ghost wide", "stop"))}`);
+  if (kind === "blocked") {
+    return heading("Debugging is restricted", "Your organization’s device policy has disabled debugging on this phone.", "Blocked")
+      + deviceCard("Policy enforced", "lock")
+      + stack(notice("Hosting is stopped. Contact your IT administrator to request an approved device or a policy update.", "error"),
+        button("Recheck IT policy", "refresh-policy", "secondary wide", "refresh"));
   }
-  if (isActive()) {
-    const status = state.session === "connected" ? (state.desktopAttached ? "ADB attached" : "Tunnel ready · Waiting for ADB")
-      : state.session === "reconnecting" ? `Trying to restore the Wi-Fi connection · <span id="reconnect-timer">${secondsLeft(state.reconnectEnds)}s</span>` : "Automatic reconnect expired. Check Wi-Fi and retry.";
-    return panel(`<h2>${peer()} is ${state.session === "connected" ? "connected" : "the session owner"}</h2>
-      <p class="lede">${status}</p>
-      ${stack(metadata(["Elapsed", `<span id="session-elapsed">${clock(elapsed(state.connectedAt))}</span>`], ["Transport", state.session === "connected" ? "Encrypted relay" : "Unavailable"]),
-        state.session === "connected" && !state.desktopAttached ? '<p class="muted">If Android asks, confirm the debugger authorization on this phone.</p>' : "",
-        state.session === "connected" ? "" : button("Retry connection", "retry", "secondary wide", "refresh"),
-        actions(button("End session", "end-session", "danger-button", "stop"), button("Go to background", "background", "ghost", "home")))}`);
-  }
-  if (!state.hosting) return "";
-  const codeContent = state.workspace === "solo"
-    ? panel(`<h2>Setu pairing code</h2><div class="code" id="pair-code">${secondsLeft(state.codeEnds) ? state.code : "Expired"}</div>
-      <p class="timer" id="pair-timer">${secondsLeft(state.codeEnds) ? `Expires in ${clock(secondsLeft(state.codeEnds))}` : "Renew for a new code"}</p>
-      <p class="lede">Share this code with the developer so they can request access.</p>`, "pair-panel")
-    : panel(`<h2>Waiting for a request</h2><p class="lede">Developers with a ${org} device grant can request access.</p>`);
-  return `${codeContent}${stack(
-    actions(state.workspace === "solo" ? button("Renew code", "renew-code", "secondary", "refresh") : "", button("Go to background", "background", "ghost", "home")),
-    button("Stop hosting", "stop-hosting", "danger-button wide", "stop"),
-  )}`;
+  return heading("Waiting for IT policy configuration", `Ask ${org} to finish managing this phone before hosting can start.`, "PolicyMissing")
+    + deviceCard("Corporate setup pending", "shield")
+    + stack(panel(metadata(["Missing", state.token ? "Device policy configuration" : "Enrollment token"], ["Hosting", "Unavailable"])),
+      notice("Solo hosting is unavailable on a device with managed configuration.", "warning"),
+      button("Recheck IT policy", "refresh-policy", "primary wide", "refresh"));
 }
 
-function relayView() {
-  const count = progress();
-  const live = state.hosting;
-  return heading(live ? "Debugging session" : "Your device", live ? "You control who can debug this phone." : "", "")
-    + `<section class="hero">${art(live ? "pulse" : "phone")}${tag(connectionLabel())}<h2>${hostName}</h2><p>Android 15 · ${state.workspace === "solo" ? "Personal device" : org}</p></section>`
-    + (live ? stack(sessionContent()) : `${section("Setup checklist", `${count} of 3 ready`)}${setupRows()}${stack(mainAction())}`);
+function hostStatus() {
+  if (state.host === "starting") return "Starting";
+  if (state.host === "reconnecting") return "Agent restarting";
+  return state.adbdWarning ? "Debugger unavailable" : "Host online";
 }
 
-function signalView() {
-  const live = state.hosting;
-  return `<div class="signal-head"><span class="overline">Device console</span>${tag(state.wifi ? "Wi-Fi online" : "Wi-Fi offline", state.wifi ? "good" : "warn", "wifi")}</div>
-    <section class="hero signal-console">${art("pulse")}<div class="overline">Local host · Android 15</div><h1 tabindex="-1">${hostName}</h1><p>${connectionLabel()}</p>
-      <dl class="metrics"><div><dt>Transport</dt><dd>${state.wireless ? "Wireless debugging" : "Wireless disabled"}</dd></div>
-      <div><dt>${live ? "Session" : "Readiness"}</dt><dd>${live ? (isActive() ? state.session : "Waiting for peer") : `${progress()} / 3 checks passed`}</dd></div></dl>
-    </section>
-    ${live ? stack(sessionContent()) : `${stack(mainAction())}${section("System checks")}${setupRows()}`}`;
+function stopControl() {
+  return button("Stop Hosting", "stop-hosting", "danger-button wide", "stop");
 }
 
-function fieldView() {
-  const live = state.hosting;
-  const current = live || ready() ? 1 : 0;
-  const step = state.policyBlocked ? ["Check organization policy", "Ask your administrator about debugging access for this phone."]
-    : !state.wifi ? ["Connect to Wi-Fi", "Join a Wi-Fi network before enabling Wireless debugging."]
-    : !state.developer ? ["Turn on Developer options", "Open About phone and tap Build number seven times."]
-    : ["Enable Wireless debugging", "Open Developer options and switch on Wireless debugging."];
-  return `<ol class="field-steps" aria-label="Tester journey">${["Prepare", "Host", "Share"].map((label, index) => `<li ${index === current ? 'aria-current="step"' : index < current ? 'class="past"' : ""}>${label}</li>`).join("")}</ol>
-  ${heading(live ? "Guide the session" : ready() ? "You’re ready to host" : "Get your phone ready", live ? "Review who’s connecting and end the session when you’re done." : "Follow the steps on this phone before your developer connects.")}
-  ${live ? sessionContent() : `<section class="hero">${art("phone")}<div class="overline">This phone</div><h2>${hostName}</h2><p>Android 15 · ${progress()} of 3 checks ready</p></section>
-    ${section("Your next step")}${panel(`<span class="overline">${ready() ? "Host" : "Prepare"}</span><h2>${ready() ? "Invite your developer" : step[0]}</h2>
-      <p class="muted">${ready() ? "Start hosting to let your developer request access." : step[1]}</p>${mainAction()}`, "field-task")}
-    ${rows(row("All setup checks", "Wi-Fi, developer options and USB", "settings", "checks"))}`}`;
+function hostView() {
+  const online = state.host === "online";
+  return progressMark(2) + heading("Hosting", state.managed ? "Organization device grants control developer access." : "Keep Setu running while your desktop connects.")
+    + deviceCard(hostStatus(), "pulse")
+    + `<div class="host-actions">${stopControl()}${button("Go to background", "background", "ghost wide", "home")}</div>`
+    + (!online ? stack(notice(state.host === "starting" ? "Starting the device agent." : "The Android SDK is restarting the host process.", "warning"))
+      : stack(
+        state.adbdWarning ? notice("Android’s local debugger is unreachable. The host is online, but ADB cannot attach.", "warning") : "",
+        state.adbdWarning ? button("Fix Android debugger", "fix-adbd", "secondary wide", "settings") : "",
+        state.notification === "denied" ? notice("Notifications are off. Setu can keep hosting. Return here to stop hosting.", "warning") : "",
+        state.managed ? panel(metadata(["Managed by", org], ["Device ID", demoDeviceId()])) :
+          panel(`<h2>Setu pairing code</h2><div class="code" id="pair-code">${demoCode(state.codeGeneration)}</div><p class="lede">Enter this in Setu Desktop. Pairing pins that desktop’s key.</p>`, "pair-panel"),
+        !state.adbdWarning && path() === "wireless" ? rows(row("Pair the Android debugger", "Android system code and port · Integration preview", "code", "show-android-pairing")) : "",
+        panel(metadata(...(state.managed ? [] : [["Device ID", demoDeviceId()]]), ["Device-side ADB endpoint", state.adbdWarning ? "Unavailable" : relatedEndpoint()],
+          ["Current peer", "Unknown"], ["Peer transport", "Unknown"]) + '<p class="lede">Setu SDK v1.0.1 reports host status. Current peer and transport require a future SDK event.</p>'),
+      ));
 }
 
-function deviceView() {
-  const views = { relay: relayView, signal: signalView, field: fieldView };
-  const policy = state.policyBlocked ? notice("Your administrator has restricted Wireless debugging on this phone.", "error")
-    : state.workspace === "corporate" && !state.enrolled ? notice(`This phone needs a ${org} enrollment and a device grant.`, "warning") : "";
-  return views[state.theme]() + (policy ? stack(policy) : "");
+function batteryStatus() {
+  return state.battery === "exempt" ? "Exemption reported" : state.battery === "current" ? "Current restrictions retained" : "Check recommended";
 }
 
-function evidenceView() {
-  const documents = state.docs.filter((item) => item.workspace === state.workspace);
-  const capture = state.recordingAt
-    ? panel(`<div class="recording-panel"><div><strong>Recording screen</strong><span class="timer" id="recording-time">${clock(elapsed(state.recordingAt))}</span></div>${button("Stop recording", "stop-recording", "danger-button", "stop")}</div>`)
-    : actions(button("Take screenshot", "capture-photo", "primary", "photo"), button("Record screen", "capture-video", "secondary", "video"));
-  return heading("Evidence", state.theme === "field" ? "Give your developer a clear view of what happened." : "Review screenshots and recordings before sharing.", state.theme === "field" ? "3 · Share what happened" : "")
-    + stack(capture, button("Import media", "import-media", "ghost wide", "import"))
-    + section("Your evidence", `${documents.length} saved`)
-    + (documents.length
-      ? rows(...documents.map((item) => row(esc(item.name), `${item.kind} · ${item.shared ? "Shared" : "Local draft"}`, item.kind === "Recording" ? "video" : "photo", "view-evidence", "", `data-evidence="${item.id}"`)))
-      : panel('<p class="muted">New captures and imports will appear here as local drafts.</p>'));
+function notificationStatus() {
+  if (state.android < 13) return "Manage in Android Settings";
+  return state.notification === "allowed" ? "Allowed" : state.notification === "denied" ? "Denied · Hosting can still run" : "Permission required for drawer visibility";
 }
 
-function selectedEvidence() {
-  return state.docs.find((item) => item.id === state.selected && item.workspace === state.workspace);
-}
-
-function mediaPreview(item) {
-  return `<div class="preview" role="img" aria-label="Mock ${item.kind.toLowerCase()} of a Sample Checkout screen showing a sync error">
-    <div class="mock-media" aria-hidden="true"><small>Sample Checkout</small><strong>Couldn’t sync this cart</strong><i></i><i></i></div>
-    ${tag(item.kind === "Recording" ? item.duration : "PNG")}
-  </div>`;
-}
-
-function evidenceDetail() {
-  const item = selectedEvidence();
-  return heading("Review evidence", esc([item.name, item.scope].filter(Boolean).join(" · "))) + mediaPreview(item)
-    + (item.kind === "Recording" ? button("Play mock preview", "play-preview", "ghost wide", "play") : "")
-    + stack(
-      `<label class="label" for="evidence-note">What happened?<textarea class="input" id="evidence-note" maxlength="220" placeholder="Add a short note for your developer">${esc(item.note)}</textarea></label>`,
-      button("Choose share destination", "share", "primary wide", "share"),
-      button("Back to evidence", "nav-evidence", "ghost wide"),
+function settingsView() {
+  return heading("Device settings", "Review Android readiness and management.")
+    + rows(
+      row("Readiness checks", `${pathLabel()} · Android ${state.android}`, "phone", "checks"),
+      row("Battery optimization", batteryStatus(), "battery", "guide-battery"),
+      row("Notifications", notificationStatus(), "bell", "guide-permission"),
+      row("Device management", state.managed ? org : "Solo · Personal device", "shield", "management-info"),
+      state.oem === "Xiaomi" ? row("Xiaomi install restrictions", state.installError ? "INSTALL_FAILED_USER_RESTRICTED" : "USB installation guidance", "lock", "miui-help") : "",
     );
 }
 
-function profileView() {
-  const label = state.workspace === "corporate" ? org : "Solo workspace";
-  const history = state.history.filter((item) => item.workspace === state.workspace);
-  return heading("Profile & settings", "") + panel(metadata(["Email", esc(state.email)], ["Workspace", label], ["Device name", hostName]))
-    + section("Device & access")
-    + rows(
-      row("Debugging readiness", `${progress()} of 3 required checks ready`, "settings", "checks"),
-      row("Service notifications", state.hosting ? "Active foreground service" : "Appears while hosting", "bell", "notification"),
-      row("Trusted access", state.trusted && state.workspace === "solo" ? "1 remembered developer" : "No remembered personal access", "shield", "trusted"),
-    )
-    + section("Recent sessions", `${history.length} ended`)
-    + (history.length
-      ? rows(...history.map((item) => row(item.name, `${item.reason} · ${item.duration}`, "clock")))
-      : panel('<p class="muted">Ended sessions in this workspace will appear here.</p>'))
-    + stack(button("Sign out", "sign-out", "ghost wide"));
-}
-
 function notificationCard() {
-  return panel(`<h2>Setu · ${connectionLabel()}</h2>
-    <p class="lede">${isActive() ? `Remote debugging with ${peer()}.` : "This device is accepting connection requests."}</p>
-    ${stack(isActive() ? button("End session", "end-session", "danger-button wide", "stop") : button("Stop hosting", "stop-hosting", "danger-button wide", "stop"))}`);
+  return panel(`<div class="notice-title">${icon("bell")}<h2>Setu remote debugging</h2></div><p class="lede">${hostStatus()}</p>${stack(stopControl())}`);
 }
 
 function backgroundView() {
-  return `<div class="desktop-home">${heading("Android home", "Setu can keep working in the background.")}
-    ${state.hosting ? `${section("Ongoing notification")}${notificationCard()}` : notice("Setu hosting is off.")}
-    ${state.recordingAt ? button("Stop recording", "stop-recording", "danger-button wide", "stop") : ""}
-    ${button("Return to Setu", "foreground", "primary wide", "phone")}</div>`;
+  return `<div class="desktop-home">${heading(state.locked ? "Android lock screen" : "Android home", "")}
+    ${notificationVisible() ? `${section("Ongoing notification")}${notificationCard()}`
+      : notice(!active() ? "Setu hosting is stopped."
+        : state.locked ? "Setu’s ongoing notice is hidden on the lock screen."
+        : "Notifications are off. The foreground service may appear in Android’s Active apps. Return to Setu to stop hosting.", "warning")}
+    ${button(state.locked ? "Unlock preview" : "Return to Setu", state.locked ? "unlock-preview" : "foreground", "primary wide", state.locked ? "lock" : "phone")}</div>`;
 }
 
 function simulationControls() {
-  if (!state.hosting) return "";
-  const items = [];
-  if (state.session === "idle") {
-    items.push(button("Simulate incoming request", "simulate-request", "secondary", "link"));
-    if (state.workspace === "solo" && secondsLeft(state.codeEnds)) items.push(button("Simulate expired pairing code", "simulate-expired-code", "ghost", "clock"));
+  const controls = [];
+  if (state.host === "online" && !state.managed && !state.fgsBackground) {
+    controls.push(button("Simulate successful Setu pairing", "simulate-pairing", "secondary", "check"),
+      button("Simulate failed PAKE attempt", "simulate-pake-failure", "ghost", "lock"));
   }
-  if (state.session === "connected") {
-    if (!state.desktopAttached) items.push(button("Simulate ADB attachment", "simulate-attach", "secondary", "code"));
-    items.push(button("Simulate network drop", "simulate-reconnect", "secondary", "pulse"));
-    items.push(button("Simulate access revocation", "simulate-revoke", "ghost", "lock"));
+  if (active() && !state.fgsBackground) {
+    controls.push(button("Simulate debugger loss", "simulate-adbd-loss", "ghost", "pulse"),
+      button("Simulate agent restart", "simulate-reconnect", "ghost", "refresh"));
   }
-  return items.join("");
+  if (state.host === "reconnecting") controls.push(button("Simulate host online", "simulate-online", "secondary", "check"));
+  if (state.fgsBackground && !state.locked) controls.push(button("Simulate lock screen", "simulate-lock", "ghost", "lock"));
+  if (!state.managed) controls.push(button("Simulate EMM enrollment", "simulate-emm", "ghost", "building"));
+  if (state.managed && (!state.policy || !state.token) && !state.blocked) controls.push(button("Simulate IT policy arrival", "simulate-policy", "secondary", "building"));
+  if (state.managed && !state.blocked) controls.push(button("Simulate IT blocking debugging", "simulate-block", "ghost", "lock"));
+  if (path() === "usb" && state.usbThisBoot) controls.push(button("Simulate phone reboot", "simulate-reboot", "ghost", "refresh"));
+  return controls.join("");
 }
 
-const scenarioOptions = [...scenarioSelect.options].map(({ value, textContent }) => [value, textContent]);
-
-function sheetContent() {
-  switch (state.sheet) {
-    case "review": return ["Prototype options", stack(
-      `<div class="review-directions">${directionButtons()}</div>`,
-      `<label class="label" for="mobile-scenario">Jump to a scenario<select id="mobile-scenario" class="input" data-scenario>
-        ${scenarioOptions.map(([key, label]) => `<option value="${key}" ${state.scenario === key ? "selected" : ""}>${label}</option>`).join("")}</select></label>`,
-      simulationControls() || "", button(state.protectedContent ? "Allow mock capture" : "Simulate protected content", "toggle-protected", "ghost wide", "lock"),
-    )];
-    case "workspace": return ["Choose a workspace", rows(
-      row("Solo", state.managed ? `Locked by ${org} policy` : "Host and share a pairing code", state.managed ? "lock" : "user", "choose-solo"),
-      row("Corporate", state.enrolled ? `${org} · Enrolled` : "Organization enrollment and grants", "building", "choose-corporate"),
-    )];
-    case "solo-locked": return ["Solo is locked", stack(
-      notice(`${org} requires this phone to use Corporate. Personal hosting and remembered Solo access are unavailable.`, "warning"),
-      button("Review enrollment", "enrollment", "primary wide", "building"),
-    )];
-    case "enrollment": return ["Corporate enrollment", stack(
-      panel(metadata(["Organization", org], ["Membership", "Verified for this demo"], ["This phone", state.enrolled ? "Enrolled" : "Pending enrollment"], ["Device grant", state.enrolled ? "Active" : "Unavailable"])),
-      notice(state.policyBlocked ? "A device administrator has disabled Wireless debugging. Contact your administrator."
-        : state.enrolled ? "Organization policy applies to debugging and evidence sharing."
-        : "An administrator must enroll this phone and grant access. Signing in with an email address alone does not grant access.", state.policyBlocked ? "error" : ""),
-      state.enrolled || state.enrollmentRequested ? "" : button("Request administrator help", "request-enrollment", "primary wide", "mail"),
-      state.enrollmentRequested && !state.enrolled ? notice("Administrator help requested in the demo.", "success") : "",
-      state.enrolled || state.policyBlocked ? "" : button("Simulate approved enrollment", "enroll", "secondary wide", "check"),
-    )];
-    case "checks": return ["Debugging readiness", stack(setupRows(), button("Recheck readiness", "recheck", "primary wide", "refresh"))];
-    case "developer": return ["Enable Developer options", stack(
-      '<ol class="step-list"><li>Open Settings, then About phone.</li><li>Tap <strong>Build number</strong> seven times.</li><li>Enter your screen lock if Android asks, then return to Setu.</li></ol>',
-      notice("On Samsung, look under About phone → Software information. You can also search Settings for Build number."),
-      state.policyBlocked ? notice("Your administrator manages Developer options on this phone.", "error") : button("Open Android Settings", "settings-developer", "primary wide", "settings"),
-    )];
-    case "wireless": return ["Enable Wireless debugging", stack(
-      '<ol class="step-list"><li>Join a Wi-Fi network on Android 11 or later.</li><li>Open Settings → System → Developer options.</li><li>Turn on <strong>Wireless debugging</strong> and approve your network if Android asks. Return to Setu.</li></ol>',
-      notice("Search Settings for Wireless debugging if your phone uses a different menu. Android’s own debugger pairing and the Setu pairing code are separate."),
-      !state.developer ? notice("Enable Developer options before this setting becomes available.", "warning") : "",
-      state.policyBlocked ? notice("Wireless debugging has been restricted by your administrator.", "error") : button("Open Android Settings", "settings-wireless", "primary wide", "settings"),
-    )];
-    case "usb": return ["Optional USB debugging", stack(
-      '<p class="muted">Use USB debugging for a wired workflow. Setu’s wireless host only checks Wireless debugging.</p>',
-      notice("Open Settings → System → Developer options → USB debugging."),
-      state.policyBlocked ? notice("Developer options are managed on this phone.", "error") : button("Open Android Settings", "settings-usb", "primary wide", "settings"),
-    )];
-    case "wifi": return ["Check Wi-Fi", stack(
-      '<p class="muted">Connect the phone to Wi-Fi to host over Wireless debugging. A network change may require Android approval again.</p>',
-      button("Open Wi-Fi settings", "settings-wifi", "primary wide", "wifi"),
-    )];
-    case "settings-developer": return ["Android Settings", stack(
-      '<p class="muted">About phone · Pixel 8a</p>',
-      rows(row("Build number", state.phoneDeveloper ? "Developer options enabled" : `${state.taps} of 7 taps`, "code", "tap-build", state.phoneDeveloper ? "good" : "")),
-      button("Return to Setu", "returned", "primary wide", "arrow"),
-    )];
-    case "settings-wireless": return ["Android Settings", stack(
-      '<p class="muted">System · Developer options</p>',
-      state.phoneDeveloper ? rows(row("Wireless debugging", state.phoneWireless ? "On" : "Off", "wifi", "toggle-wireless", state.phoneWireless ? "good" : "")) : notice("Turn on Developer options first.", "warning"),
-      !state.phoneWifi ? notice("Connect to Wi-Fi to enable Wireless debugging.", "warning") : "",
-      button("Return to Setu", "returned", "primary wide", "arrow"),
-    )];
-    case "settings-usb": return ["Android Settings", stack(
-      '<p class="muted">System · Developer options</p>',
-      state.phoneDeveloper ? rows(row("USB debugging", state.phoneUsb ? "On" : "Off", "usb", "toggle-usb", state.phoneUsb ? "good" : "")) : notice("Turn on Developer options first.", "warning"),
-      button("Return to Setu", "returned", "primary wide", "arrow"),
-    )];
-    case "settings-wifi": return ["Android Settings", stack(
-      '<p class="muted">Internet · Available networks</p>',
-      rows(row("Studio Wi-Fi", state.phoneWifi ? "Connected · Tap to disconnect" : "Available · Tap to connect", "wifi", "toggle-wifi", state.phoneWifi ? "good" : "")),
-      button("Return to Setu", "returned", "primary wide", "arrow"),
-    )];
-    case "returned": return ["Back in Setu", stack(
-      '<p class="muted">Check what changed in Android Settings before continuing.</p>',
-      button("Recheck readiness", "recheck", "primary wide", "refresh"),
-    )];
-    case "notification": return ["Service notifications", stack(
-      state.hosting ? notificationCard() : '<p class="muted">Android shows an ongoing notification while the device is hosting or connected. You can stop it there when Setu is in the background.</p>',
-      state.hosting && !state.background ? button("Go to background", "background", "secondary wide", "home") : "",
-    )];
-    case "trusted": return ["Trusted access", stack(
-      state.workspace === "corporate" ? notice(`Trusted corporate access is managed by ${org} device grants.`)
-        : state.trusted ? rows(row(soloPeer, "Remembered developer · Approval still required", "user")) : notice("There are no remembered developers."),
-      state.trusted && state.workspace === "solo" ? button("Clear trusted access", "clear-trusted", "danger-button wide", "shield") : "",
-    )];
-    case "capture": return [state.capture === "Recording" ? "Start screen recording?" : "Allow screen capture?", stack(
-      '<p class="muted">Android asks for permission each time Setu starts capturing. Screens with protected content may be hidden.</p>',
-      `<fieldset><legend>Share with Setu</legend><label class="radio"><input name="capture-scope" type="radio" value="app" checked>One app</label><label class="radio"><input name="capture-scope" type="radio" value="screen">Entire screen</label></fieldset>`,
-      actions(button("Don’t allow", "deny-capture", "secondary"), button("Allow capture", "allow-capture", "primary")),
-    )];
-    case "import": return ["Import media", stack(
-      '<p class="muted">Choose a demo item from the simulated Android picker.</p>',
-      rows(row("Checkout screenshot", "PNG · 420 KB", "photo", "import-photo"), row("Checkout recording", "MP4 · 14 sec", "video", "import-video")),
-    )];
-    case "share": {
-      const item = selectedEvidence();
-      const restricted = state.workspace === "corporate";
-      return ["Share preview", stack(
-        mediaPreview(item), panel(metadata(["File", esc(item.name)], ["Note", esc(item.note || "No note added")])),
-        rows(row(restricted ? `${org} project inbox` : "Developer inbox", "Share to the current workspace", "share", "share-workspace"),
-          row("Android share sheet", restricted ? "Blocked by organization policy" : "Preview another destination", restricted ? "lock" : "arrow", "share-external")),
+function guideContent(step) {
+  switch (step) {
+    case "developer":
+      return ["Enable Developer options", stack(
+        '<ol class="step-list"><li>Open Settings, then About phone.</li><li>Tap <strong>Build number</strong> seven times. Enter your screen lock if Android asks.</li><li>Return to Setu to recheck.</li></ol>',
+        notice("On Samsung, look under About phone → Software information. Menu labels vary by model."),
+        button("Open Android Settings", "settings-developer", "primary wide", "settings"),
+      )];
+    case "wireless":
+      return ["Enable Wireless debugging", stack(
+        '<ol class="step-list"><li>Keep this Android 11 or later phone on Wi-Fi.</li><li>Open Developer options and turn on <strong>Wireless debugging</strong>. Approve the network if Android asks.</li><li>Return to Setu. After starting hosting, open Android’s separate pairing dialog when the developer is ready.</li></ol>',
+        state.developer ? button("Open Android Settings", "settings-wireless", "primary wide", "settings")
+          : button("Enable Developer options first", "guide-developer", "primary wide", "code"),
+      )];
+    case "usb":
+      return ["Prepare ADB over USB", stack(
+        notice("Use an authorized local workstation and an isolated, approved lab. Never forward port 5555 or expose it to other network devices.", "warning"),
+        '<ol class="step-list"><li>Enable USB debugging. Connect by USB and authorize the workstation’s RSA key on Android.</li><li>On the authorized workstation, run <code>adb tcpip 5555</code> once per boot if this OEM permits it.</li><li>After the lab confirms endpoint reachability and isolation, unplug and use the selected network. Repeat the local USB setup after a reboot.</li></ol>',
+        state.developer ? button("Open USB setup", "settings-usb", "primary wide", "usb")
+          : button("Enable Developer options first", "guide-developer", "primary wide", "code"),
+      )];
+    case "legacy-restricted":
+      return ["USB bootstrap is unavailable", stack(
+        notice("An administrator or lab owner must approve the legacy transport, and the OEM must allow it. Hosting stays off without both.", "warning"),
+        '<p class="muted">If possible, join Wi-Fi on Android 11 or later to use Wireless debugging. Ask IT which devices and networks are approved.</p>',
+      )];
+    case "battery": {
+      const manufacturerPath = {
+        Pixel: "Settings → Apps → Setu → App battery usage. Look for Unrestricted or Allow background usage.",
+        Xiaomi: "Settings → Apps → Permissions → Background autostart. Turn on Setu if allowed. In Setu’s Battery saver setting, look for No restrictions.",
+        Samsung: "Settings → Battery and device care → Battery → Background usage limits → Never sleeping apps. Add Setu if allowed.",
+        ColorOS: "Settings → Apps → App management → Setu → Battery usage. Look for Allow background activity or App battery management.",
+      }[state.oem];
+      return ["Check battery restrictions", stack(
+        '<p class="muted">Android and manufacturer battery settings can interrupt background hosting. Look for an exemption if company policy permits it.</p>',
+        notice(manufacturerPath),
+        state.oem === "Pixel" ? "" : button(`Try ${state.oem} battery shortcut`, "oem-shortcut", "secondary wide", "settings"),
         state.notice ? notice(state.notice.message, state.notice.type) : "",
+        button("Open battery settings", "settings-battery", "primary wide", "battery"),
+        button("Keep current setting", "skip-battery", "ghost wide"),
       )];
     }
-    case "external-destination": return ["Android share sheet", stack(
-      '<p class="muted">Choose a demo app. Your draft stays available in Evidence.</p>',
-      rows(row("Save to downloads", "Demo export", "import", "share-complete"), row("Mail", "Simulate destination unavailable", "mail", "share-fails")),
+    case "permission":
+      return ["What the notification shows", stack(
+        '<p class="muted">While hosting, Setu’s ongoing notice offers Stop Hosting. The notice never includes Setu or Android pairing codes. The companion uses Android’s <code>VISIBILITY_SECRET</code> to hide the notice on a secure lock screen.</p>',
+        notice(state.android >= 13
+          ? "Android 13+ asks for POST_NOTIFICATIONS. Declining can hide the notice from the drawer. Hosting can still run, and you can stop it in Setu."
+          : "Manage Setu’s notice in Android Settings."),
+        button(state.android >= 13 ? "Review notification permission" : "Open notification settings", "settings-permission", "primary wide", "bell"),
+      )];
+    default: return null;
+  }
+}
+
+function returnFromSettings() {
+  return button("Return to Setu", "return-from-settings", "primary wide", "arrow");
+}
+
+function settingsSheet() {
+  switch (state.settingsPage) {
+    case "developer": return ["Android Settings · About phone", stack(
+      rows(row("Build number", state.developer ? "Developer options enabled" : `${state.taps} of 7 taps`, "code", "tap-build", state.developer ? "good" : "")),
+      returnFromSettings(),
+    )];
+    case "wireless": return ["Android Settings · Developer options", stack(
+      rows(row("Wireless debugging", state.wireless ? "On" : "Off", "wifi", "toggle-wireless", state.wireless ? "good" : "")),
+      returnFromSettings(),
+    )];
+    case "usb": return ["Local USB setup", stack(
+      rows(
+        row("USB debugging", state.usb ? "On" : "Off", "usb", "toggle-usb", state.usb ? "good" : ""),
+        row("Authorize local workstation", state.usbAuthorized ? "RSA key authorized" : "Confirm Android’s RSA prompt on the phone", "shield", state.usb ? "authorize-usb" : ""),
+        row("Confirm local ADB bootstrap", state.usbThisBoot ? "Endpoint confirmed for this boot" : "Confirm endpoint reachability and lab isolation", "check", state.usbAuthorized && !state.usbThisBoot ? "confirm-usb" : ""),
+      ),
+      returnFromSettings(),
+    )];
+    case "battery": return ["Android Settings · Battery", stack(
+      rows(row("Battery optimization exemption", state.battery === "exempt" ? "Exemption reported" : "Standard restrictions", "battery", "toggle-battery", state.battery === "exempt" ? "good" : "")),
+      '<p class="muted">Even with an exemption, verify background operation on the actual model.</p>',
+      returnFromSettings(),
+    )];
+    case "permission": return [state.android >= 13 ? "Allow Setu to send notifications?" : "Android Settings · Notifications", stack(
+      '<p class="muted">Show an ongoing notice with a Stop Hosting action while Setu is hosting.</p>',
+      actions(button("Don’t allow", "deny-notifications", "secondary"), button("Allow", "allow-notifications", "primary")),
+    )];
+    case "miui": return ["Xiaomi Settings · Developer options", stack(
+      '<p class="muted">Preview these OEM settings only on a device where your administrator permits USB installation.</p>',
+      rows(
+        row("Install via USB", state.usbInstall ? "On" : "Off", "usb", "toggle-install-via-usb", state.usbInstall ? "good" : ""),
+        row("USB debugging (Security settings)", state.usbSecurity ? "On" : "Off", "shield", "toggle-usb-security", state.usbSecurity ? "good" : ""),
+      ),
+      notice("After changing the settings, ask the developer to retry the install. The desktop reports whether the install succeeds."),
+      button("Return to Setu", "close-sheet", "primary wide", "arrow"),
     )];
     default: return null;
   }
 }
 
-let sheetOpener = "";
+function readinessChecks() {
+  return rows(
+    row("Developer options", state.developer ? "Enabled" : "Required · Tap Build number seven times", "code", "guide-developer", state.developer ? "good" : "warn"),
+    row(pathLabel(), path() === "wireless" ? (state.wireless ? "Enabled" : "Required · Android 11+ on Wi-Fi")
+      : !state.legacyAllowed ? "Unavailable under current lab policy" : state.usbThisBoot ? "Ready for this boot" : "Required · Authorized local workstation",
+    path() === "wireless" ? "wifi" : "usb", `guide-${path() === "usb" && !state.legacyAllowed ? "legacy-restricted" : path()}`, readyForHost() ? "good" : "warn"),
+    row("Battery optimization", batteryStatus(), "battery", "guide-battery"),
+    row("Foreground notice", notificationStatus(), "bell", "guide-permission"),
+  );
+}
+
+function sheetContent() {
+  if (state.sheet === "guide") return guideContent(state.nextGuide);
+  if (state.sheet === "settings") return settingsSheet();
+  switch (state.sheet) {
+    case "returned": return ["Back in Setu", stack(
+      '<p class="muted">Recheck device readiness after this Settings change.</p>',
+      button("Recheck readiness", "recheck-readiness", "primary wide", "refresh"),
+    )];
+    case "review": return ["Prototype options", stack(
+      `<label class="label" for="mobile-scenario">Jump to a scenario<select id="mobile-scenario" class="input" data-scenario>
+        ${scenarioOptions.map(([key, label]) => `<option value="${key}" ${state.scenario === key ? "selected" : ""}>${label}</option>`).join("")}</select></label>`,
+      simulationControls(),
+      '<p class="muted">The preview uses fictional device and SDK events. It does not change Android settings or open any connections.</p>',
+    )];
+    case "checks": return ["Device readiness", readinessChecks()];
+    case "management": return ["Device management", stack(
+      panel(metadata(["Mode", mode()], ["Organization", state.managed ? org : "None"], ["Policy", state.blocked ? "Debugging restricted"
+        : state.managed ? state.token && state.policy ? "Configuration received" : "Waiting for IT" : "Personal device"])),
+      state.managed ? '<p class="muted">Rechecking refreshes policy status. The device agent applies new settings when it starts again.</p>'
+        : '<p class="muted">Solo is local-first. The phone needs no account. Android device management can enroll this phone in Corporate.</p>',
+      button("Recheck IT policy", "refresh-policy", "secondary wide", "refresh"),
+    )];
+    case "notification": return ["Notification drawer", notificationVisible() ? notificationCard() : notice("Setu’s notice is unavailable.")];
+    case "android-pairing": return ["Pair the Android debugger", stack(
+      tag("Integration preview", "warn"),
+      '<p class="muted">On the phone, open Developer options → Wireless debugging → Pair device with pairing code. Read Android’s six-digit code and temporary pairing port.</p>',
+      button("Preview Android pairing screen", "preview-system-pairing", "primary wide", "code"),
+      notice("Tunneled pairing needs a dedicated pairing endpoint and app transport adapter. A real phone and desktop must validate this flow before release.", "warning"),
+    )];
+    case "android-system-code": return ["Android pairing screen", stack(
+      panel(metadata(["System pairing code", '<code>836104</code>'], ["Temporary pairing port", '<code>37193</code>'])),
+      '<p class="muted">Demo values. Tell the developer both values for the proposed tunneled debugger pairing in Setu Desktop. Android generates them for the pairing dialog. The debugger connection port and the Setu pairing code serve separate purposes.</p>',
+      notice("Integration preview · This screen does not run ADB pairing.", "warning"),
+    )];
+    case "miui": return ["Xiaomi install restricted", stack(
+      notice("INSTALL_FAILED_USER_RESTRICTED", "error"),
+      state.blocked ? '<p class="muted">Your organization restricts USB installation. Ask IT to review the app and policy.</p>'
+        : '<p class="muted">On supported MIUI builds, open Developer options and check Install via USB and USB debugging (Security settings). Approve Android’s own install prompts only where IT permits.</p>',
+      state.blocked ? "" : button("Try Xiaomi settings shortcut", "miui-shortcut", "secondary wide", "settings"),
+      state.notice ? notice(state.notice.message, state.notice.type) : "",
+      state.blocked || !state.notice ? "" : button("Preview manual Xiaomi settings", "settings-miui", "primary wide", "settings"),
+      '<p class="muted">Some builds omit these settings or require a managed install. Ask IT if they are unavailable.</p>',
+    )];
+    default: return null;
+  }
+}
 
 function measureSheet() {
   const box = device.getBoundingClientRect();
@@ -461,63 +428,45 @@ function measureSheet() {
   device.style.setProperty("--sheet-bottom", `${Math.max(0, innerHeight - box.bottom + device.clientTop)}px`);
 }
 
-function render({ focusHeading = false, focusAction = "", focusReview = "" } = {}) {
-  const active = document.activeElement;
-  const previousScreen = device.querySelector(".screen");
-  const scroll = previousScreen?.scrollTop || 0;
-  const previousSheet = device.querySelector(".sheet");
-  const oldSheet = previousSheet?.open ? previousSheet.dataset.sheet : "";
-  const action = active?.dataset?.action || "";
-  if (state.sheet && !oldSheet) sheetOpener = action;
+function render({ headingFocus = false } = {}) {
+  const action = document.activeElement?.dataset.action || "";
+  const scroll = device.querySelector(".screen")?.scrollTop || 0;
+  const oldDialog = device.querySelector("dialog[open]");
+  const oldDialogKey = oldDialog?.dataset.sheetKey || "";
+  const oldDialogScroll = oldDialog?.scrollTop || 0;
+  const nextDialogKey = [state.sheet, state.nextGuide, state.settingsPage].join("-");
+  if (state.sheet && !oldDialog) sheetOpener = action;
   const sheet = sheetContent();
-  const page = state.background ? backgroundView()
-    : !state.signedIn ? authView()
-    : state.screen === "evidence" ? evidenceView()
-    : state.screen === "detail" && selectedEvidence() ? evidenceDetail()
-    : state.screen === "profile" ? profileView() : deviceView();
-
-  device.dataset.theme = state.theme;
-  directions.querySelectorAll("button").forEach((choice) => {
-    const selected = choice.dataset.direction === state.theme;
-    choice.setAttribute("aria-pressed", String(selected));
-    choice.querySelector(":scope > svg")?.remove();
-    if (selected) choice.insertAdjacentHTML("beforeend", icon("check"));
-  });
-  document.querySelector("#scenario-actions").innerHTML = simulationControls();
-  scenarioSelect.value = state.scenario;
-  device.innerHTML = `${topbar()}
-    ${!state.background && state.hosting ? `<div class="service">${icon("bell")}<span>Setu service · ${connectionLabel()}</span>${iconButton("View ongoing notification", "notification", "next")}</div>` : ""}
-    ${!state.background && state.recordingAt && state.screen !== "evidence" ? `<div class="service">${icon("video")}<span>Recording screen</span>${iconButton("Stop recording", "stop-recording", "stop")}</div>` : ""}
-    <main class="screen" tabindex="-1">${state.notice && !sheet ? `<div class="feedback">${notice(state.notice.message, state.notice.type)}</div>` : ""}${page}</main>
-    ${state.signedIn && !state.background ? nav() : ""}
-    <div class="gesture" aria-hidden="true"><i></i></div>
-    ${sheet ? `<dialog class="sheet" data-sheet="${state.sheet}" aria-labelledby="sheet-title">
+  const policyGate = gate();
+  const page = state.fgsBackground ? backgroundView() : state.screen === "settings" ? settingsView() : policyGate ? managementView(policyGate) : active() ? hostView() : setupView();
+  scenarios.value = state.scenario;
+  reviewControls.innerHTML = simulationControls();
+  document.querySelector("#device-caption").textContent = `${state.model} · Android prototype`;
+  device.innerHTML = `${topbar()}<main class="screen" tabindex="-1">
+    ${state.notice && !sheet ? `<div class="feedback">${notice(state.notice.message, state.notice.type)}</div>` : ""}${page}</main>
+    ${state.fgsBackground ? "" : nav()}<div class="gesture" aria-hidden="true"><i></i></div>
+    ${sheet ? `<dialog class="sheet" data-sheet-key="${nextDialogKey}" aria-labelledby="sheet-title">
       <div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h2 id="sheet-title" tabindex="-1">${sheet[0]}</h2>${iconButton("Close", "close-sheet", "close")}</div>
       ${sheet[1]}</dialog>` : ""}`;
-  if (!focusHeading) device.querySelector(".screen").scrollTop = scroll;
+  const screen = device.querySelector(".screen");
+  if (!headingFocus) screen.scrollTop = scroll;
   if (sheet) {
-    const dialog = device.querySelector(".sheet");
+    const dialog = device.querySelector("dialog");
     measureSheet();
     dialog.showModal();
     dialog.addEventListener("cancel", (event) => {
       event.preventDefault();
       closeSheet();
     });
-    if (focusReview) {
-      dialog.querySelector(`[data-direction="${focusReview}"]`)?.focus({ preventScroll: true });
-    } else if (oldSheet === state.sheet && action && dialog.querySelector(`[data-action="${action}"]`)) {
-      dialog.scrollTop = previousSheet.scrollTop;
-      dialog.querySelector(`[data-action="${action}"]`).focus({ preventScroll: true });
-    } else {
-      dialog.querySelector("#sheet-title").focus({ preventScroll: true });
-    }
+    const repeatedButton = oldDialogKey === nextDialogKey && action ? dialog.querySelector(`[data-action="${action}"]`) : null;
+    if (repeatedButton) dialog.scrollTop = oldDialogScroll;
+    (repeatedButton || dialog.querySelector("#sheet-title")).focus({ preventScroll: true });
+  } else if (headingFocus) {
+    (screen.querySelector("h1") || screen).focus({ preventScroll: true });
   } else {
-    const focus = focusHeading ? device.querySelector("main h1") || device.querySelector("main")
-      : device.querySelector(`[data-action="${focusAction || (oldSheet ? sheetOpener : action)}"]`)
-        || document.querySelector(`#scenario-actions [data-action="${action}"]`);
-    focus?.focus({ preventScroll: true });
+    const selectedAction = oldDialog ? sheetOpener : action;
+    document.querySelector(`[data-action="${selectedAction}"]`)?.focus({ preventScroll: true });
   }
-  updateTimers();
 }
 
 function flash(message, type = "") {
@@ -526,438 +475,306 @@ function flash(message, type = "") {
 }
 
 function closeSheet() {
-  state.sheet = null;
   state.notice = null;
+  state.sheet = "";
   render();
 }
 
-function openSheet(name) {
-  state.sheet = name;
+function openSheet(sheet) {
+  state.sheet = sheet;
   render();
 }
 
-function goTo(screen) {
-  state.screen = screen;
-  state.sheet = null;
-  render({ focusHeading: true });
+function openGuide(guide) {
+  state.nextGuide = guide;
+  openSheet("guide");
 }
 
-function createCode(first = false) {
-  if (first) state.code = "4821-K7QZPM";
-  else {
-    const alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
-    const numbers = crypto.getRandomValues(new Uint16Array(7));
-    state.code = `${String(numbers[0] % 10000).padStart(4, "0")}-${[...numbers.slice(1)].map((n) => alphabet[n % alphabet.length]).join("")}`;
-  }
-  state.codeEnds = Date.now() + 120_000;
+function showDevice() {
+  state.screen = "device";
+  state.sheet = "";
+  state.fgsBackground = false;
+  state.locked = false;
+  render({ headingFocus: true });
+}
+
+function stopAgent() {
+  clearTimeout(startTimer);
+  state.host = "idle";
+  state.adbdWarning = false;
+  state.failedAttempts = 0;
+  state.codeGeneration = 0;
 }
 
 function startHosting() {
-  state.sheet = null;
-  if (!permitted()) return openSheet("enrollment");
-  if (!ready()) return runAction(nextSetup());
-  state.hosting = true;
-  state.session = "idle";
-  if (state.workspace === "solo") createCode(true);
-  goTo("device");
+  if (gate() || nextStep() || !readyForHost() || active()) return;
+  state.host = "starting";
+  showDevice();
+  startTimer = setTimeout(() => {
+    if (state.host !== "starting" || gate()) return;
+    state.host = "online";
+    announce.textContent = "Host online.";
+    render();
+  }, 220);
 }
 
-function endSession(reason, keepHosting = true) {
-  clearTimeout(settlementTimer);
-  if (isActive()) state.history.unshift({ name: peer(), reason, workspace: state.workspace, duration: clock(elapsed(state.connectedAt)) });
-  state.session = "idle";
-  state.hosting = keepHosting && permitted() && ready();
-  state.desktopAttached = false;
-  state.reconnectEnds = 0;
-  state.connectedAt = 0;
-  if (state.hosting && state.workspace === "solo") createCode();
-  else {
-    state.code = "";
-    state.codeEnds = 0;
+function applyScenario(scenario, headingFocus = false) {
+  clearTimeout(startTimer);
+  state = defaultState(scenario);
+  const prepared = ["ready", "hosting", "adbd", "reconnecting", "notifications-denied", "policy-missing", "token-missing", "managed-transition", "managed-hosting", "blocked"];
+  if (prepared.includes(scenario)) {
+    state.developer = state.wireless = true;
+    state.taps = 7;
+    state.battery = "exempt";
+    state.notification = "allowed";
   }
-}
-
-function makeEvidence(kind, mode, seconds = 0, name) {
-  const item = {
-    id: state.docs.length + 1,
-    name: name || `${mode === "import" ? "Checkout " : ""}${kind.toLowerCase()}.${kind === "Recording" ? "mp4" : "png"}`,
-    kind, duration: clock(seconds), note: "", shared: false, workspace: state.workspace,
-    scope: mode === "capture" ? state.captureScope : "",
-  };
-  state.docs.unshift(item);
-  state.selected = item.id;
-  return item;
-}
-
-function saveRecording() {
-  if (!state.recordingAt) return;
-  makeEvidence("Recording", "capture", elapsed(state.recordingAt));
-  state.recordingAt = 0;
-  state.captureScope = "";
-}
-
-function applyScenario(scenario, theme = state.theme, focusHeading = false) {
-  clearTimeout(settlementTimer);
-  state = initialState(theme);
-  state.scenario = scenario;
-  if (["ready", "request", "active", "recovery", "managed", "evidence"].includes(scenario)) {
-    state.developer = state.phoneDeveloper = true;
-    state.wireless = state.phoneWireless = true;
+  if (["wifi", "samsung", "coloros", "miui"].includes(scenario)) {
+    state.developer = true;
     state.taps = 7;
   }
-  if (["request", "active", "recovery"].includes(scenario)) {
-    state.hosting = true;
-    createCode(true);
-    state.session = scenario === "request" ? "request" : scenario === "active" ? "connected" : "offline";
-    state.connectedAt = Date.now() - 219_000;
-    state.desktopAttached = scenario === "active";
+  if (scenario === "usb" || scenario === "cellular") {
+    state.android = scenario === "usb" ? 10 : 15;
+    state.network = scenario === "cellular" ? "cellular" : "wifi";
+    state.model = "Lab Android";
+    state.legacyAllowed = true;
+    state.developer = true;
+    state.taps = 7;
+    state.notification = state.android < 13 ? "allowed" : "unrequested";
   }
-  if (scenario === "signup") state.signedIn = false;
-  if (scenario === "managed" || scenario === "blocked") {
+  if (["policy-missing", "token-missing", "managed-transition", "managed-hosting", "blocked"].includes(scenario)) {
     state.managed = true;
-    state.workspace = "corporate";
-    state.policyBlocked = scenario === "blocked";
+    state.token = scenario !== "token-missing";
+    state.policy = !["policy-missing", "token-missing"].includes(scenario);
+    state.ack = scenario !== "managed-transition";
+    state.blocked = scenario === "blocked";
   }
-  if (scenario === "evidence") {
-    const item = makeEvidence("Screenshot", "import", 0, "checkout-sync.png");
-    item.note = "The cart stayed on the loading screen after switching to Wi-Fi.";
-    state.screen = "detail";
+  if (["hosting", "adbd", "notifications-denied", "managed-hosting"].includes(scenario)) state.host = "online";
+  if (scenario === "adbd") {
+    state.wireless = false;
+    state.adbdWarning = true;
   }
-  render({ focusHeading });
+  if (scenario === "reconnecting") state.host = "reconnecting";
+  if (scenario === "notifications-denied") state.notification = "denied";
+  if (scenario === "miui") {
+    state.oem = "Xiaomi";
+    state.model = "Xiaomi 13";
+    state.installError = true;
+    state.screen = "settings";
+  }
+  if (scenario === "samsung" || scenario === "coloros") {
+    state.oem = scenario === "samsung" ? "Samsung" : "ColorOS";
+    state.model = scenario === "samsung" ? "Galaxy S24" : "OPPO Find X7";
+    state.wireless = true;
+  }
+  announce.textContent = "";
+  render({ headingFocus });
 }
 
-function recheck() {
-  state.developer = state.phoneDeveloper;
-  state.wifi = state.phoneWifi;
-  state.wireless = state.phoneDeveloper && state.phoneWireless && !state.policyBlocked;
-  state.usb = state.phoneDeveloper && state.phoneUsb;
-  if (state.hosting && !ready()) endSession("Debugging became unavailable", false);
-  state.sheet = null;
-  flash(ready() ? "Phone is ready for wireless hosting." : "Settings checked. A required step remains.", ready() ? "success" : "");
-  render({ focusAction: ready() ? "start-host" : nextSetup() });
+function completeReadiness() {
+  state.sheet = "";
+  if (active()) state.adbdWarning = !readyForHost();
+  flash(active() && state.adbdWarning ? "Android’s debugger is still unavailable." : "Readiness checked.",
+    active() && state.adbdWarning ? "warning" : "success");
+  render({ headingFocus: true });
 }
 
-function shareDone() {
-  selectedEvidence().shared = true;
-  flash("Evidence shared in the demo.", "success");
-  goTo("evidence");
+function applyPolicyPreview() {
+  if (state.queuedPolicy) {
+    const previouslyEnrolled = state.token;
+    state.token = state.policy = true;
+    state.queuedPolicy = "";
+    if (!previouslyEnrolled) state.ack = false;
+    state.sheet = "";
+    if (state.notification === "unrequested" && state.android < 13) state.notification = "allowed";
+    flash(gate() === "transition"
+      ? "IT enrollment received. Review the management notice."
+      : "IT policy received. It takes effect when you start hosting.", "success");
+    return showDevice();
+  }
+  state.sheet = "";
+  flash(state.blocked ? "IT policy still restricts debugging." : state.managed && (!state.token || !state.policy)
+    ? "Still waiting for IT configuration." : "Policy status refreshed.", state.blocked ? "error" : "");
+  render({ headingFocus: true });
 }
 
-function runAction(action, control) {
+function runAction(action) {
   state.notice = null;
-  if (action.startsWith("nav-")) return goTo(action.slice(4));
-  if (action.startsWith("guide-")) return openSheet(action.slice(6));
-  if (action.startsWith("settings-")) return openSheet(action);
-  if (action.startsWith("auth-")) {
-    state.email = device.querySelector("#email")?.value || state.email;
-    state.auth = action.slice(5);
-    state.authError = "";
-    return render();
+  if (action.startsWith("nav-")) {
+    state.screen = action.slice(4);
+    state.sheet = "";
+    return render({ headingFocus: true });
   }
+  if (action.startsWith("guide-")) {
+    const step = action.slice(6);
+    if (state.blocked && ["developer", "wireless", "usb"].includes(step)) return showDevice();
+    return openGuide(step);
+  }
+  if (action.startsWith("settings-")) {
+    state.settingsPage = action.slice(9);
+    if (state.blocked && ["developer", "wireless", "usb", "miui"].includes(state.settingsPage)) return showDevice();
+    return openSheet("settings");
+  }
+
   switch (action) {
     case "close-sheet": return closeSheet();
-    case "review": case "checks": case "notification": case "workspace": case "trusted": case "enrollment": case "returned":
-      return openSheet(action);
-    case "choose-solo":
-      if (state.managed) return openSheet("solo-locked");
-      if (state.workspace !== "solo") {
-        saveRecording();
-        endSession("Workspace changed", false);
-      }
-      state.workspace = "solo";
-      return goTo("device");
-    case "choose-corporate":
-      if (state.workspace !== "corporate") {
-        saveRecording();
-        endSession("Workspace changed", false);
-      }
-      state.workspace = "corporate";
-      state.screen = "device";
-      if (!state.enrolled || state.policyBlocked) return openSheet("enrollment");
-      return goTo("device");
-    case "request-enrollment":
-      state.enrollmentRequested = true;
-      announce.textContent = "Administrator help requested in the demo.";
-      break;
-    case "enroll":
-      if (state.policyBlocked) return;
-      state.enrolled = true;
-      state.managed = true;
-      state.workspace = "corporate";
-      flash(`This phone is enrolled with ${org} and has a device grant.`, "success");
-      return goTo("device");
-    case "edit-email":
-      state.verification = false;
-      state.authError = "";
-      break;
-    case "resend":
-      if (secondsLeft(state.resendAfter)) return;
-      beginVerification();
-      flash("A new demo verification code is available.", "success");
-      break;
+    case "continue-setup":
+      if (!gate() && nextStep()) return openGuide(nextStep());
+      return;
+    case "review": case "checks": return openSheet(action);
+    case "management-info": return openSheet("management");
+    case "return-from-settings": return openSheet("returned");
+    case "recheck-readiness": return completeReadiness();
     case "tap-build":
       state.taps = Math.min(7, state.taps + 1);
-      state.phoneDeveloper = state.taps === 7;
-      announce.textContent = state.phoneDeveloper ? "Developer options enabled in the simulator." : `${state.taps} of 7 taps.`;
+      state.developer = state.taps === 7;
+      announce.textContent = state.developer ? "Developer options enabled." : `${state.taps} of 7 taps.`;
       break;
     case "toggle-wireless":
-      if (!state.phoneWifi || !state.phoneDeveloper || state.policyBlocked) return;
-      state.phoneWireless = !state.phoneWireless;
-      announce.textContent = state.phoneWireless ? "Wireless debugging on." : "Wireless debugging off.";
+      state.wireless = !state.wireless;
+      announce.textContent = state.wireless ? "Wireless debugging on." : "Wireless debugging off.";
       break;
     case "toggle-usb":
-      state.phoneUsb = !state.phoneUsb;
-      announce.textContent = state.phoneUsb ? "USB debugging on." : "USB debugging off.";
+      state.usb = !state.usb;
+      if (!state.usb) state.usbAuthorized = state.usbThisBoot = false;
+      announce.textContent = state.usb ? "USB debugging on." : "USB debugging off.";
       break;
-    case "toggle-wifi":
-      state.phoneWifi = !state.phoneWifi;
-      if (!state.phoneWifi) state.phoneWireless = false;
-      announce.textContent = state.phoneWifi ? "Wi-Fi connected." : "Wi-Fi disconnected.";
+    case "authorize-usb":
+      if (!state.legacyAllowed || !state.usb) return;
+      state.usbAuthorized = true;
+      announce.textContent = "Local workstation authorized in the preview.";
       break;
-    case "recheck": return recheck();
-    case "start-host": return startHosting();
-    case "renew-code":
-      if (!state.hosting || state.workspace !== "solo" || state.session !== "idle") return;
-      createCode();
-      flash("New Setu pairing code is ready.", "success");
+    case "confirm-usb":
+      if (!state.legacyAllowed || !state.usbAuthorized) return;
+      state.usbThisBoot = true;
+      announce.textContent = "Local bootstrap confirmed for this boot.";
       break;
-    case "simulate-expired-code":
-      state.codeEnds = Date.now();
-      state.sheet = null;
-      flash("This pairing code has expired. Renew it to accept a new request.", "warning");
+    case "toggle-battery":
+      state.battery = state.battery === "exempt" ? "current" : "exempt";
+      announce.textContent = batteryStatus();
       break;
-    case "simulate-request":
-      if (!state.hosting || state.session !== "idle") return;
-      state.sheet = null;
-      if (state.workspace === "solo" && !secondsLeft(state.codeEnds)) {
-        flash("This pairing code has expired. Renew the code and try again.", "error");
-        break;
-      }
-      state.session = "request";
-      announce.textContent = `${peer()} wants to connect.`;
-      return state.background ? render() : goTo("device");
-    case "approve":
-      if (!state.hosting || state.session !== "request" || !permitted() || !ready()) return;
-      state.session = "connected";
-      state.connectedAt = Date.now();
-      state.desktopAttached = false;
-      flash(`${peer()} was approved. The tunnel is ready.`, "success");
+    case "skip-battery":
+      if (state.battery === "unreviewed") state.battery = "current";
+      return closeSheet();
+    case "oem-shortcut":
+      flash("The manufacturer shortcut is unavailable in this preview. Follow the manual path above.", "warning");
       break;
-    case "decline":
-      state.session = "idle";
-      flash(`${peer()}’s request was declined. Hosting is still on.`);
-      break;
-    case "simulate-attach":
-      if (state.session !== "connected") return;
-      state.desktopAttached = true;
-      state.sheet = null;
-      flash("The developer attached ADB in the demo.", "success");
-      break;
-    case "simulate-reconnect":
-      if (state.session !== "connected") return;
-      state.session = "reconnecting";
-      state.desktopAttached = false;
-      state.reconnectEnds = Date.now() + 8000;
-      state.sheet = null;
-      flash("Network interrupted. Trying to reconnect.", "warning");
-      settlementTimer = setTimeout(() => {
-        if (state.session !== "reconnecting") return;
-        state.session = "offline";
-        flash("Automatic reconnect expired.", "error");
-        render();
-      }, 8000);
-      break;
-    case "retry":
-      if (!isActive() || state.session === "connected") return;
-      clearTimeout(settlementTimer);
-      state.reconnectEnds = 0;
-      state.session = "connected";
-      flash("Connection restored. The tunnel is ready.", "success");
-      break;
-    case "simulate-revoke":
-      endSession("Access revoked", false);
-      state.sheet = null;
-      flash("Developer access was revoked. Hosting stopped.", "error");
-      break;
-    case "end-session":
-      if (!isActive()) return;
-      endSession("Ended on this phone");
-      state.sheet = null;
-      flash("Session ended. Hosting is still on.");
-      break;
+    case "allow-notifications": case "deny-notifications":
+      state.notification = action === "allow-notifications" ? "allowed" : "denied";
+      return openSheet("returned");
+    case "start-hosting": return startHosting();
     case "stop-hosting":
-      endSession("Hosting stopped", false);
-      state.sheet = null;
-      flash("Hosting stopped. This phone isn’t accepting requests.");
-      break;
+      stopAgent();
+      state.sheet = "";
+      flash("Hosting stopped. The device agent and its connections have stopped.", "success");
+      return render({ headingFocus: true });
+    case "fix-adbd": return openGuide(path());
+    case "open-notification":
+      if (notificationVisible()) return openSheet("notification");
+      return;
+    case "show-android-pairing":
+      if (state.host === "online" && path() === "wireless" && !state.adbdWarning) return openSheet("android-pairing");
+      return;
+    case "preview-system-pairing": return openSheet("android-system-code");
     case "background":
-      state.background = true;
-      state.sheet = null;
-      return render({ focusHeading: true });
-    case "foreground":
-      state.background = false;
-      return goTo("device");
-    case "clear-trusted":
-      state.trusted = false;
-      announce.textContent = "Remembered access cleared.";
+      state.fgsBackground = true;
+      state.sheet = "";
+      return render({ headingFocus: true });
+    case "foreground": return showDevice();
+    case "unlock-preview":
+      state.locked = false;
+      state.sheet = "";
+      return render({ headingFocus: true });
+    case "acknowledge-management":
+      state.ack = true;
+      return showDevice();
+    case "refresh-policy": return applyPolicyPreview();
+    case "miui-help": return openSheet("miui");
+    case "miui-shortcut":
+      flash("The Xiaomi shortcut is unavailable. Open Settings → Developer options or ask IT for a managed installation.", "warning");
       break;
-    case "sign-out":
-      saveRecording();
-      endSession("Signed out", false);
-      state.signedIn = false;
-      state.verification = false;
-      state.verificationEnds = 0;
-      state.authError = "";
-      state.sheet = null;
-      state.auth = "login";
-      state.scenario = "signup";
-      return render({ focusHeading: true });
-    case "capture-photo": case "capture-video":
-      if (state.recordingAt) return;
-      state.capture = action === "capture-video" ? "Recording" : "Screenshot";
-      return openSheet("capture");
-    case "deny-capture":
-      state.capture = null;
-      state.sheet = null;
-      flash("Screen capture was declined. You can import media instead.", "warning");
+    case "toggle-install-via-usb":
+      if (state.blocked || state.oem !== "Xiaomi") return;
+      state.usbInstall = !state.usbInstall;
+      announce.textContent = state.usbInstall ? "Install via USB on." : "Install via USB off.";
       break;
-    case "allow-capture":
-      state.captureScope = device.querySelector('input[name="capture-scope"]:checked')?.value === "screen" ? "Entire screen" : "One app";
-      if (state.protectedContent) {
-        state.capture = null;
-        state.captureScope = "";
-        state.sheet = null;
-        flash("Android hid protected content. Capture a different app or import media.", "error");
-      } else if (state.capture === "Recording") {
-        state.recordingAt = Date.now();
-        state.capture = null;
-        state.sheet = null;
-        flash("Screen recording started in the demo.");
+    case "toggle-usb-security":
+      if (state.blocked || state.oem !== "Xiaomi") return;
+      state.usbSecurity = !state.usbSecurity;
+      announce.textContent = state.usbSecurity ? "USB debugging security settings on." : "USB debugging security settings off.";
+      break;
+    case "simulate-pairing": case "simulate-pake-failure": {
+      if (state.host !== "online" || state.managed || state.fgsBackground) return;
+      const accepted = action === "simulate-pairing";
+      if (!accepted) state.failedAttempts += 1;
+      if (accepted || state.failedAttempts === 3) {
+        state.failedAttempts = 0;
+        state.codeGeneration += 1;
+        flash(accepted ? "Pairing succeeded. The SDK issued a new code." : "The SDK issued a new code after three failed PAKE attempts.", "success");
       } else {
-        makeEvidence("Screenshot", "capture");
-        state.capture = null;
-        state.captureScope = "";
-        return goTo("detail");
+        flash(`Failed attempt ${state.failedAttempts} of 3. The pairing code stays the same.`, "warning");
       }
-      break;
-    case "stop-recording":
-      saveRecording();
-      state.background = false;
-      return goTo("detail");
-    case "import-media": return openSheet("import");
-    case "import-photo": case "import-video":
-      makeEvidence(action === "import-video" ? "Recording" : "Screenshot", "import", 14);
-      return goTo("detail");
-    case "view-evidence":
-      state.selected = Number(control.dataset.evidence);
-      return goTo("detail");
-    case "play-preview": {
-      const preview = device.querySelector(".preview");
-      preview.classList.remove("mock-playing");
-      requestAnimationFrame(() => requestAnimationFrame(() => preview.classList.add("mock-playing")));
-      announce.textContent = "Playing the demo preview.";
-      return;
+      return showDevice();
     }
-    case "share": return openSheet("share");
-    case "share-workspace": return shareDone();
-    case "share-external":
-      if (state.workspace === "corporate") {
-        flash(`${org} blocks sharing outside the organization. Your draft is saved.`, "error");
-        break;
-      }
-      return openSheet("external-destination");
-    case "share-complete":
-      if (state.workspace === "solo") return shareDone();
-      return;
-    case "share-fails":
-      flash("That destination is unavailable. Your local draft is saved.", "error");
-      return openSheet("share");
-    case "toggle-protected":
-      state.protectedContent = !state.protectedContent;
-      announce.textContent = state.protectedContent ? "Protected content simulation is on." : "Protected content simulation is off.";
-      break;
+    case "simulate-adbd-loss":
+      if (state.host !== "online") return;
+      if (path() === "wireless") state.wireless = false;
+      else state.usbThisBoot = false;
+      state.adbdWarning = true;
+      announce.textContent = "Android’s local debugger is unreachable.";
+      return showDevice();
+    case "simulate-reconnect":
+      if (state.host !== "online") return;
+      state.host = "reconnecting";
+      announce.textContent = "Setu SDK is restarting the agent.";
+      return showDevice();
+    case "simulate-online":
+      if (state.host !== "reconnecting" || gate()) return;
+      state.host = "online";
+      state.adbdWarning = !readyForHost();
+      announce.textContent = "Setu host is online.";
+      return showDevice();
+    case "simulate-lock":
+      if (!state.fgsBackground) return;
+      state.locked = true;
+      state.sheet = "";
+      return render({ headingFocus: true });
+    case "simulate-emm":
+      stopAgent();
+      state.managed = state.token = true;
+      state.policy = state.ack = false;
+      return showDevice();
+    case "simulate-policy":
+      state.queuedPolicy = "ready";
+      flash("IT has sent an update in the preview. Recheck IT policy to read it.", "success");
+      return showDevice();
+    case "simulate-block":
+      stopAgent();
+      state.blocked = true;
+      return showDevice();
+    case "simulate-reboot":
+      stopAgent();
+      state.usbThisBoot = false;
+      flash("Phone rebooted. Repeat the local USB bootstrap before hosting.", "warning");
+      return showDevice();
     default: return;
   }
   render();
 }
 
-function beginVerification() {
-  state.verification = true;
-  state.verificationEnds = Date.now() + 300_000;
-  state.resendAfter = Date.now() + 10_000;
-  state.authError = "";
-}
-
-function updateTimers() {
-  const timer = document.querySelector("#pair-timer");
-  if (timer) {
-    const remaining = secondsLeft(state.codeEnds);
-    timer.textContent = remaining ? `Expires in ${clock(remaining)}` : "Renew for a new code";
-    if (!remaining) document.querySelector("#pair-code").textContent = "Expired";
-  }
-  const resend = document.querySelector("#resend");
-  if (resend) {
-    const remaining = secondsLeft(state.resendAfter);
-    resend.disabled = Boolean(remaining);
-    resend.textContent = remaining ? `Resend in ${remaining}s` : "Resend code";
-  }
-  const session = document.querySelector("#session-elapsed");
-  if (session) session.textContent = clock(elapsed(state.connectedAt));
-  const recording = document.querySelector("#recording-time");
-  if (recording) recording.textContent = clock(elapsed(state.recordingAt));
-  const reconnect = document.querySelector("#reconnect-timer");
-  if (reconnect) reconnect.textContent = `${secondsLeft(state.reconnectEnds)}s`;
-}
-
 document.addEventListener("click", (event) => {
-  const direction = event.target.closest("button[data-direction]");
-  if (direction) {
-    state.theme = direction.dataset.direction;
-    render({ focusReview: state.theme });
-    return;
-  }
-  const control = event.target.closest("button[data-action]");
-  if (control) runAction(control.dataset.action, control);
+  const action = event.target.closest("button[data-action]")?.dataset.action;
+  if (action) runAction(action);
 });
 
 document.addEventListener("change", (event) => {
-  if (event.target === scenarioSelect || event.target.matches("[data-scenario]")) applyScenario(event.target.value, state.theme, event.target !== scenarioSelect);
-});
-
-document.addEventListener("input", (event) => {
-  if (event.target.id === "evidence-note") selectedEvidence().note = event.target.value;
-});
-
-device.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const form = event.target;
-  const input = new FormData(form);
-  state.notice = null;
-  if (form.dataset.form === "email") {
-    state.email = input.get("email").trim();
-    beginVerification();
-    render({ focusHeading: true });
-  } else if (!secondsLeft(state.verificationEnds) || input.get("code") !== "482619") {
-    state.authError = secondsLeft(state.verificationEnds) ? "That code doesn’t match. Try the demo code shown below." : "That code expired. Request a new code below.";
-    announce.textContent = state.authError;
-    render();
-    const code = document.querySelector("#email-code");
-    code.value = input.get("code");
-    code.focus();
-  } else {
-    state.verification = false;
-    state.verificationEnds = 0;
-    state.signedIn = true;
-    flash("Email verified.", "success");
-    goTo("device");
+  if (event.target === scenarios || event.target.matches("[data-scenario]")) {
+    applyScenario(event.target.value, event.target !== scenarios);
   }
 });
 
-directions.innerHTML = directionButtons();
-const url = new URLSearchParams(location.search);
-const requestedTheme = url.get("theme");
-const requestedScenario = url.get("scenario");
-applyScenario(scenarioOptions.some(([key]) => key === requestedScenario) ? requestedScenario : "setup",
-  Object.hasOwn(themes, requestedTheme) ? requestedTheme : "relay");
-window.addEventListener("resize", measureSheet);
-setInterval(updateTimers, 1000);
+window.addEventListener("resize", () => {
+  if (state.sheet) measureSheet();
+});
+
+const scenarioFromUrl = new URLSearchParams(location.search).get("scenario");
+applyScenario(scenarioOptions.some(([key]) => key === scenarioFromUrl) ? scenarioFromUrl : "setup");

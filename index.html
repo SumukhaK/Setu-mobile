@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f6fb">
+  <meta name="theme-color" content="#fcf6ee">
   <title>Setu for Android</title>
   <link rel="stylesheet" href="prototype.css">
   <script src="prototype.js" defer></script>
@@ -13,28 +13,35 @@
     <aside class="review" aria-labelledby="review-title">
       <div class="review-product" id="review-product"></div>
       <h1 id="review-title">Setu for<br>Android.</h1>
-      <p class="review-intro">Three ways to prepare, host, and review a remote debugging session.</p>
-      <div class="review-directions" id="directions" aria-label="Design direction"></div>
+      <p class="review-intro">Prepare an Android device for remote debugging, then manage hosting from the phone.</p>
       <div class="review-scenarios">
         <label for="scenario">Jump to a scenario</label>
         <select id="scenario">
-          <option value="setup">Device setup</option>
-          <option value="signup">Email onboarding</option>
+          <option value="setup">Start device setup</option>
+          <option value="wifi">Wireless debugging setup</option>
+          <option value="usb">Android 10 via USB</option>
+          <option value="cellular">Cellular-only via USB</option>
           <option value="ready">Ready to host</option>
-          <option value="request">Incoming request</option>
-          <option value="active">Active session</option>
-          <option value="recovery">Connection lost</option>
-          <option value="managed">Managed enrollment</option>
-          <option value="blocked">Debugging restricted</option>
-          <option value="evidence">Evidence review</option>
+          <option value="hosting">Solo host online</option>
+          <option value="adbd">Android debugger unavailable</option>
+          <option value="reconnecting">Agent restarting</option>
+          <option value="notifications-denied">Notifications declined</option>
+          <option value="policy-missing">Waiting for IT policy</option>
+          <option value="token-missing">Waiting for enrollment token</option>
+          <option value="managed-transition">Organization management received</option>
+          <option value="managed-hosting">Corporate host online</option>
+          <option value="blocked">Debugging restricted by IT</option>
+          <option value="miui">Xiaomi install restricted</option>
+          <option value="samsung">Samsung battery readiness</option>
+          <option value="coloros">ColorOS battery readiness</option>
         </select>
       </div>
       <div id="scenario-actions" class="review-controls"></div>
-      <p class="review-footer">Interactive design preview · Demo data</p>
+      <p class="review-footer">Offline design preview · Setu SDK v1.0.1</p>
     </aside>
     <div class="device-stage">
-      <div class="device" id="device" data-theme="relay"></div>
-      <p class="device-caption">Pixel 8a <span>·</span> Android prototype</p>
+      <div class="device" id="device"></div>
+      <p class="device-caption" id="device-caption">Android prototype</p>
     </div>
   </div>
   <div id="announce" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>

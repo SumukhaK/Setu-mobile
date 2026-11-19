@@ -1,5 +1,7 @@
 # Setu walkthrough transcript
 
+> Historical recording. For the audited design, see the [current Setu journeys](https://github.com/SumukhaK/Setu-Desktop/blob/main/docs/JOURNEYS.md).
+
 Relay desktop and Field Android · 07:05 · Narrated prototype using fictional accounts and simulated connections.
 
 ## Chapters
