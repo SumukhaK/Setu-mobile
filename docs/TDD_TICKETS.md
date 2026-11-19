@@ -4,7 +4,7 @@ Re-review date: 2026-11-19 · Reviewed: `SumukhaK/Setu-Desktop` main @ `57fd2d2`
 
 Companion to the first architecture and UX audit against v1.0.1.
 
-> **Status in this repository.** The section 2 and section 3 baseline updates are applied in [Setu-Desktop `docs/JOURNEYS.md`](https://github.com/SumukhaK/Setu-Desktop/blob/main/docs/JOURNEYS.md) (canonical, including P01–P22) and in each repository's `docs/SCREENS.md`. The prototype fixture changes in section 2.7 are not applied yet. The same file lives in both Setu-Desktop and Setu-mobile.
+> **Status in this repository.** The section 2 and section 3 baseline updates are applied in [Setu-Desktop `docs/JOURNEYS.md`](https://github.com/SumukhaK/Setu-Desktop/blob/main/docs/JOURNEYS.md) (canonical, including P01–P22) and in each repository's `docs/SCREENS.md`. The section 2.7 v1.1.0 fixtures are applied in both browser prototypes (2026-11-19 design rebase); the review text below is kept as written on its review date. Device-lab and native implementation gates remain. The same file lives in both Setu-Desktop and Setu-mobile.
 
 ## Ticket status (Setu-mobile)
 
@@ -291,7 +291,7 @@ The repos are still wireframes, so the tickets fix a stack. Change it once, here
 
 ### AT-07 · Connected desktops and End session
 - **Files:** `feature/host/SessionsList.kt`, `SessionRow.kt`.
-- **Tests first:** P10 (rewritten: label shown as unverified, transport, path, End → `endSession(id)` true; unknown id → false, no crash), P14 phone half (row shows "reconnecting" on `DOWN`, removed on close), P22 phone half.
+- **Tests first:** P10 (rewritten: label shown under **Connected as (unverified)** (AD-3), transport, path, End → `endSession(id)` true; unknown id → false, no crash; the row stays as "Ending…" until the `sessions` snapshot drops it, and the host and other rows keep running), P14 phone half (row shows "reconnecting" on `DOWN`, removed on close), P22 phone half.
 - **SDK binding:** `SetuManager.sessions: StateFlow<List<DeviceSession>>`, `DeviceSession(id, peerLabel, transport, kind, openedAtMs, path)`, `PathState`, `endSession(id)`.
 
 ### AT-08 · Debugger recovery and system pairing guidance

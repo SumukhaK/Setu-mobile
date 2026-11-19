@@ -77,7 +77,7 @@ The SDK's permissions (INTERNET, network/wifi state, multicast) come in through 
 
 - AD-1: `HostingService` (AT-02) is the only caller of `SetuManager.initialize`, `start`, `stop` and `refreshPolicy`.
 - AD-2: Notifications use `SetuNotifications.content(...).publicText` for both the private and public versions, with `VISIBILITY_SECRET`; `text` is never posted (P06, TDD_TICKETS §2.6).
-- AD-3: `peer_label` is shown as "Computer name (unverified)" until the SDK exposes a verified subject (P22).
+- AD-3: `peerLabel` is shown under "Connected as (unverified)", never "Computer name": the SDK fills it from the desktop's `--label`, else the corporate user, else `desktop-<key fingerprint>`. It stays unverified until the SDK exposes `peer_user` and `peer_fingerprint` (P22). "Unnamed computer" is only a defensive fallback for a blank label.
 - AD-4: Never cache the unscoped corporate policy JSON (P07).
 - AD-5: The SDK is vendored (not on Maven) and consumed with `api(files(...))` plus an explicit `kotlinx-coroutines-android` 1.10.2. Checksum verified against the v1.1.0 release asset.
 - AD-6: applicationId and namespace `dev.setu.mobile`; modules `dev.setu.mobile.core.<name>`, `dev.setu.mobile.feature.<name>`.

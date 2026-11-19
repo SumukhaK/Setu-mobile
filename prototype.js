@@ -7,6 +7,9 @@ const reviewControls = document.querySelector("#scenario-actions");
 const org = "Northstar QA";
 const demoDeviceId = () => state.managed ? "qa-pixel8a-07" : "pixel-8a-casey";
 const demoCode = (generation) => `4821-${String(512903 + generation * 137).padStart(6, "0").slice(-6)}`;
+const transportLabels = { lan: "Direct LAN", "relay-wss": "Encrypted relay · WSS", "relay-ws": "Relay · WS", "relay-tcp": "Relay · TCP" };
+const pathLabels = { UP: "Path up", DOWN: "Reconnecting", LOST: "Path lost" };
+const escaped = (value) => String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
 const icons = {
   logo: '<path d="M3 15c4 0 5-7 9-7s5 7 9 7M3 19c4 0 5-7 9-7s5 7 9 7M3 11c4 0 5-7 9-7s5 7 9 7"/>',
   next: '<path d="m9 6 6 6-6 6"/>',
@@ -48,7 +51,8 @@ function defaultState(scenario) {
     developer: false, wireless: false, usb: false, usbAuthorized: false, usbThisBoot: false, legacyAllowed: false,
     battery: "unreviewed", notification: "unrequested", taps: 0, fgsBackground: false, locked: false,
     managed: false, token: false, policy: false, blocked: false, ack: false, queuedPolicy: "",
-    host: "idle", adbdWarning: false, failedAttempts: 0, codeGeneration: 0,
+    host: "idle", adbdWarning: false, failedAttempts: 0, codeGeneration: 0, pathStatus: null,
+    sessions: [], selectedSession: "", pendingEnds: new Set(),
     installError: false, usbInstall: false, usbSecurity: false, nextGuide: "", notice: null,
   };
 }
@@ -56,6 +60,7 @@ function defaultState(scenario) {
 let state = defaultState("setup");
 let startTimer;
 let sheetOpener = "";
+let sheetOpenerPeer = "";
 
 function path() {
   return state.android >= 11 && state.network === "wifi" ? "wireless" : "usb";
@@ -133,8 +138,8 @@ function progressMark(current) {
     `<li ${index === current ? 'aria-current="step"' : index < current ? 'class="past"' : ""}>${label}</li>`).join("")}</ol>`;
 }
 
-function deviceCard(status, symbol = "phone") {
-  return `<section class="hero">${art(symbol)}${tag(status)}<h2>${state.model}</h2><p>Android ${state.android} · ${state.network === "wifi" ? "Wi-Fi connected" : "Cellular only"}</p></section>`;
+function deviceCard(status, symbol = "phone", extra = "") {
+  return `<section class="hero ${extra}">${art(symbol)}${tag(status)}<h2>${state.model}</h2><p>Android ${state.android} · ${state.network === "wifi" ? "Wi-Fi connected" : "Cellular only"}</p></section>`;
 }
 
 function taskDetails(step) {
@@ -191,24 +196,51 @@ function hostStatus() {
 }
 
 function stopControl() {
-  return button("Stop Hosting", "stop-hosting", "danger-button wide", "stop");
+  return button("Stop hosting", "stop-hosting", "danger-button wide", "stop");
+}
+
+function sessionCards() {
+  const items = state.sessions.map(({ id, peerLabel, transport, kind, path: status }) => {
+    const name = escaped(peerLabel.trim() || "Unnamed computer");
+    const channel = Object.hasOwn(transportLabels, transport) ? transportLabels[transport] : "Unknown transport";
+    const pending = state.pendingEnds.has(id);
+    const label = `${pending ? "Ending" : "End session for"} ${name}`;
+    return `<li class="peer-session" data-session-id="${escaped(id)}"><div class="peer-identity">
+      <span>Connected as (unverified)</span><strong>${name}</strong>
+      <p>${kind === "adb-pair" ? "Android debugger pairing" : "ADB debugging"} · ${channel}</p>
+      ${tag(pathLabels[status], status === "UP" ? "" : "warn")}</div>
+      ${button(pending ? "Ending…" : "End", "end-peer", "secondary", "", `aria-label="${label}"${pending ? " disabled" : ""}`)}</li>`;
+  }).join("");
+  return section("Open sessions", String(state.sessions.length))
+    + (items ? `<ul class="peer-list" aria-label="Open desktop sessions">${items}</ul>` : panel('<p class="muted">No desktop sessions are open. This phone is still hosting.</p>'));
+}
+
+function pathNotice() {
+  if (state.pathStatus?.state === "DOWN" && state.sessions.some((session) => session.id === state.pathStatus.sessionId)) {
+    return notice("Holding a session while its connection recovers. The ADB stream stays open during the rejoin window.", "warning");
+  }
+  if (state.pathStatus?.state === "LOST") return notice("A session’s network path was lost. Its ADB stream closed. Reattach the debugger from Setu Desktop when the phone is reachable.", "warning");
+  return "";
 }
 
 function hostView() {
   const online = state.host === "online";
+  const pairing = state.managed ? "" : panel(`<h2>Setu pairing code</h2><div class="code" id="pair-code">${demoCode(state.codeGeneration)}</div><p class="lede">Enter this in Setu Desktop. Pairing pins that desktop’s key.</p>`, "pair-panel");
   return progressMark(2) + heading("Hosting", state.managed ? "Organization device grants control developer access." : "Keep Setu running while your desktop connects.")
-    + deviceCard(hostStatus(), "pulse")
+    + deviceCard(hostStatus(), "pulse", "host-hero")
     + `<div class="host-actions">${stopControl()}${button("Go to background", "background", "ghost wide", "home")}</div>`
     + (!online ? stack(notice(state.host === "starting" ? "Starting the device agent." : "The Android SDK is restarting the host process.", "warning"))
       : stack(
         state.adbdWarning ? notice("Android’s local debugger is unreachable. The host is online, but ADB cannot attach.", "warning") : "",
         state.adbdWarning ? button("Fix Android debugger", "fix-adbd", "secondary wide", "settings") : "",
         state.notification === "denied" ? notice("Notifications are off. Setu can keep hosting. Return here to stop hosting.", "warning") : "",
-        state.managed ? panel(metadata(["Managed by", org], ["Device ID", demoDeviceId()])) :
-          panel(`<h2>Setu pairing code</h2><div class="code" id="pair-code">${demoCode(state.codeGeneration)}</div><p class="lede">Enter this in Setu Desktop. Pairing pins that desktop’s key.</p>`, "pair-panel"),
-        !state.adbdWarning && path() === "wireless" ? rows(row("Pair the Android debugger", "Android system code and port · Integration preview", "code", "show-android-pairing")) : "",
-        panel(metadata(...(state.managed ? [] : [["Device ID", demoDeviceId()]]), ["Device-side ADB endpoint", state.adbdWarning ? "Unavailable" : relatedEndpoint()],
-          ["Current peer", "Unknown"], ["Peer transport", "Unknown"]) + '<p class="lede">Setu SDK v1.0.1 reports host status. Current peer and transport require a future SDK event.</p>'),
+        pathNotice(),
+        !state.sessions.length ? pairing : "",
+        sessionCards(),
+        state.sessions.length ? pairing : "",
+        !state.adbdWarning && path() === "wireless" ? rows(row("Pair the Android debugger", "Android system code and optional port", "code", "show-android-pairing")) : "",
+        panel(metadata(...(state.managed ? [["Managed by", org]] : []), ["Device ID", demoDeviceId()],
+          ["Device-side ADB endpoint", state.adbdWarning ? "Unavailable" : relatedEndpoint()])),
       ));
 }
 
@@ -233,7 +265,10 @@ function settingsView() {
 }
 
 function notificationCard() {
-  return panel(`<div class="notice-title">${icon("bell")}<h2>Setu remote debugging</h2></div><p class="lede">${hostStatus()}</p>${stack(stopControl())}`);
+  const count = state.sessions.length;
+  const status = state.sessions.some((session) => session.path === "DOWN") ? "Reconnecting a session"
+    : count === 1 ? "1 open session" : count > 1 ? `${count} open sessions` : hostStatus();
+  return panel(`<div class="notice-title">${icon("bell")}<h2>Setu remote debugging</h2></div><p class="lede">${status}</p>${stack(stopControl())}`);
 }
 
 function backgroundView() {
@@ -254,6 +289,12 @@ function simulationControls() {
   if (active() && !state.fgsBackground) {
     controls.push(button("Simulate debugger loss", "simulate-adbd-loss", "ghost", "pulse"),
       button("Simulate agent restart", "simulate-reconnect", "ghost", "refresh"));
+  }
+  const first = state.sessions[0];
+  if (first?.path === "UP") controls.push(button("Simulate session path down", "simulate-path-down", "ghost", "pulse"));
+  if (first?.path === "DOWN") {
+    controls.push(button("Simulate session path recovery", "simulate-path-up", "ghost", "refresh"),
+      button("Simulate session path loss", "simulate-path-lost", "ghost", "pulse"));
   }
   if (state.host === "reconnecting") controls.push(button("Simulate host online", "simulate-online", "secondary", "check"));
   if (state.fgsBackground && !state.locked) controls.push(button("Simulate lock screen", "simulate-lock", "ghost", "lock"));
@@ -308,7 +349,7 @@ function guideContent(step) {
     }
     case "permission":
       return ["What the notification shows", stack(
-        '<p class="muted">While hosting, Setu’s ongoing notice offers Stop Hosting. The notice never includes Setu or Android pairing codes. The companion uses Android’s <code>VISIBILITY_SECRET</code> to hide the notice on a secure lock screen.</p>',
+        '<p class="muted">While hosting, Setu’s ongoing notice offers Stop hosting. The notice never includes Setu or Android pairing codes. The companion uses Android’s <code>VISIBILITY_SECRET</code> to hide the notice on a secure lock screen.</p>',
         notice(state.android >= 13
           ? "Android 13+ asks for POST_NOTIFICATIONS. Declining can hide the notice from the drawer. Hosting can still run, and you can stop it in Setu."
           : "Manage Setu’s notice in Android Settings."),
@@ -346,7 +387,7 @@ function settingsSheet() {
       returnFromSettings(),
     )];
     case "permission": return [state.android >= 13 ? "Allow Setu to send notifications?" : "Android Settings · Notifications", stack(
-      '<p class="muted">Show an ongoing notice with a Stop Hosting action while Setu is hosting.</p>',
+      '<p class="muted">Show an ongoing notice with a Stop hosting action while Setu is hosting.</p>',
       actions(button("Don’t allow", "deny-notifications", "secondary"), button("Allow", "allow-notifications", "primary")),
     )];
     case "miui": return ["Xiaomi Settings · Developer options", stack(
@@ -396,16 +437,26 @@ function sheetContent() {
       button("Recheck IT policy", "refresh-policy", "secondary wide", "refresh"),
     )];
     case "notification": return ["Notification drawer", notificationVisible() ? notificationCard() : notice("Setu’s notice is unavailable.")];
+    case "end-peer": {
+      const session = state.sessions.find(({ id }) => id === state.selectedSession);
+      if (!session) return ["Session already closed", button("Done", "close-sheet", "secondary wide")];
+      return ["End this session?", stack(
+        panel(metadata(["Connected as (unverified)", escaped(session.peerLabel.trim() || "Unnamed computer")])),
+        `<p class="muted">${session.path === "UP"
+          ? "Setu sends a final close to the desktop so it can end the session without retrying."
+          : "Setu ends the session on this phone now. Its connection to the computer is down, so the computer may not see the end until it reconnects or times out."} Other sessions and existing access stay in place.</p>`,
+        actions(button("Cancel", "close-sheet", "secondary"), button("End session", "confirm-end-peer", "danger-button", "stop")),
+      )];
+    }
     case "android-pairing": return ["Pair the Android debugger", stack(
-      tag("Integration preview", "warn"),
-      '<p class="muted">On the phone, open Developer options → Wireless debugging → Pair device with pairing code. Read Android’s six-digit code and temporary pairing port.</p>',
+      '<ol class="step-list"><li>On the phone, open Developer options → Wireless debugging → Pair device with pairing code.</li><li>Leave the Android pairing dialog open. In Setu Desktop, select this phone and choose Pair Android Debugger.</li><li>Enter the six-digit Android system code. Leave the port blank to discover it automatically, or enter the temporary pairing port shown by Android.</li></ol>',
       button("Preview Android pairing screen", "preview-system-pairing", "primary wide", "code"),
-      notice("Tunneled pairing needs a dedicated pairing endpoint and app transport adapter. A real phone and desktop must validate this flow before release.", "warning"),
+      notice("Setu Desktop pairs the Android debugger through the tunnel using session.pair_adb. Connect the debugger after pairing succeeds."),
     )];
     case "android-system-code": return ["Android pairing screen", stack(
       panel(metadata(["System pairing code", '<code>836104</code>'], ["Temporary pairing port", '<code>37193</code>'])),
-      '<p class="muted">Demo values. Tell the developer both values for the proposed tunneled debugger pairing in Setu Desktop. Android generates them for the pairing dialog. The debugger connection port and the Setu pairing code serve separate purposes.</p>',
-      notice("Integration preview · This screen does not run ADB pairing.", "warning"),
+      '<p class="muted">Demo values. Enter the six-digit system code in Setu Desktop. If discovery fails, also enter the temporary pairing port shown here. Keep this dialog open while the desktop pairs.</p>',
+      notice("Android debugger pairing uses its own system code and port. Solo device pairing uses the 10-digit Setu code."),
     )];
     case "miui": return ["Xiaomi install restricted", stack(
       notice("INSTALL_FAILED_USER_RESTRICTED", "error"),
@@ -430,12 +481,16 @@ function measureSheet() {
 
 function render({ headingFocus = false } = {}) {
   const action = document.activeElement?.dataset.action || "";
+  const focusedPeer = document.activeElement?.closest("[data-session-id]")?.dataset.sessionId || "";
   const scroll = device.querySelector(".screen")?.scrollTop || 0;
   const oldDialog = device.querySelector("dialog[open]");
   const oldDialogKey = oldDialog?.dataset.sheetKey || "";
   const oldDialogScroll = oldDialog?.scrollTop || 0;
   const nextDialogKey = [state.sheet, state.nextGuide, state.settingsPage].join("-");
-  if (state.sheet && !oldDialog) sheetOpener = action;
+  if (state.sheet && !oldDialog) {
+    sheetOpener = action;
+    sheetOpenerPeer = focusedPeer;
+  }
   const sheet = sheetContent();
   const policyGate = gate();
   const page = state.fgsBackground ? backgroundView() : state.screen === "settings" ? settingsView() : policyGate ? managementView(policyGate) : active() ? hostView() : setupView();
@@ -465,7 +520,9 @@ function render({ headingFocus = false } = {}) {
     (screen.querySelector("h1") || screen).focus({ preventScroll: true });
   } else {
     const selectedAction = oldDialog ? sheetOpener : action;
-    document.querySelector(`[data-action="${selectedAction}"]`)?.focus({ preventScroll: true });
+    const peer = oldDialog ? sheetOpenerPeer : focusedPeer;
+    const owner = peer ? [...device.querySelectorAll("[data-session-id]")].find((row) => row.dataset.sessionId === peer) : document;
+    owner?.querySelector(`[data-action="${selectedAction}"]`)?.focus({ preventScroll: true });
   }
 }
 
@@ -504,6 +561,75 @@ function stopAgent() {
   state.adbdWarning = false;
   state.failedAttempts = 0;
   state.codeGeneration = 0;
+  clearSessions();
+}
+
+function clearSessions() {
+  state.sessions = [];
+  state.pendingEnds.clear();
+  state.pathStatus = null;
+}
+
+// Mirrors SetuManager.sessions. An accepted end command leaves the row until session_close.
+function applySessionEvent(type, fields) {
+  if (type === "session_open") {
+    state.sessions = [...state.sessions.filter(({ id }) => id !== fields.id), { ...fields, path: "UP" }];
+  } else if (type === "session_close") {
+    state.pendingEnds.delete(fields.id);
+    state.sessions = state.sessions.filter(({ id }) => id !== fields.id);
+  } else {
+    const pathState = { path_down: "DOWN", path_up: "UP", path_lost: "LOST" }[type];
+    state.pathStatus = { sessionId: fields.id, state: pathState, transport: fields.transport };
+    state.sessions = state.sessions.map((session) => session.id === fields.id
+      ? { ...session, path: pathState, transport: fields.transport ?? session.transport }
+      : session);
+  }
+}
+
+function updateAndroidSessions(rows) {
+  if (!Array.isArray(rows)) return;
+  state.sessions = rows.filter(row => typeof row?.id === "string" && row.id).map(row => ({
+    id: row.id,
+    peerLabel: typeof row.peerLabel === "string" ? row.peerLabel : "",
+    transport: typeof row.transport === "string" ? row.transport : "",
+    kind: row.kind === "adb-pair" ? "adb-pair" : "adb",
+    path: ["UP", "DOWN", "LOST"].includes(row.path) ? row.path : "UP",
+  }));
+  for (const id of state.pendingEnds) {
+    if (!state.sessions.some(session => session.id === id)) {
+      state.pendingEnds.delete(id);
+      flash("Session ended on Android. Hosting is still on.", "success");
+    }
+  }
+  render();
+}
+
+window.setuAndroidSessions = updateAndroidSessions;
+
+async function endSessionPreview(id) {
+  state.sheet = "";
+  if (state.host !== "online" || state.pendingEnds.has(id) || !state.sessions.some((session) => session.id === id)) {
+    flash("The agent could not accept this end request. Check the current session list.", "warning");
+    return render({ headingFocus: true });
+  }
+  const preview = state;
+  state.pendingEnds.add(id);
+  render({ headingFocus: true });
+  if (typeof window.setuAndroidEndSession === "function") {
+    let accepted = false;
+    try { accepted = await window.setuAndroidEndSession(id); } catch { /* Surface an unavailable end action. */ }
+    if (state === preview && !accepted && state.pendingEnds.delete(id)) {
+      flash("The agent could not accept this end request. Check the current session list.", "warning");
+      render();
+    }
+    return;
+  }
+  setTimeout(() => {
+    if (state !== preview || !state.pendingEnds.has(id)) return;
+    applySessionEvent("session_close", { id, reason: "ended_on_device" });
+    flash("Session ended on Android. Hosting is still on.", "success");
+    render();
+  }, 350);
 }
 
 function startHosting() {
@@ -521,7 +647,8 @@ function startHosting() {
 function applyScenario(scenario, headingFocus = false) {
   clearTimeout(startTimer);
   state = defaultState(scenario);
-  const prepared = ["ready", "hosting", "adbd", "reconnecting", "notifications-denied", "policy-missing", "token-missing", "managed-transition", "managed-hosting", "blocked"];
+  const hostScenarios = ["hosting", "hosting-empty", "hosting-unnamed", "path-down", "path-lost", "adbd", "notifications-denied", "managed-hosting"];
+  const prepared = ["ready", ...hostScenarios, "reconnecting", "policy-missing", "token-missing", "managed-transition", "blocked"];
   if (prepared.includes(scenario)) {
     state.developer = state.wireless = true;
     state.taps = 7;
@@ -548,7 +675,22 @@ function applyScenario(scenario, headingFocus = false) {
     state.ack = scenario !== "managed-transition";
     state.blocked = scenario === "blocked";
   }
-  if (["hosting", "adbd", "notifications-denied", "managed-hosting"].includes(scenario)) state.host = "online";
+  if (hostScenarios.includes(scenario)) state.host = "online";
+  if (["hosting", "hosting-unnamed", "path-down", "path-lost", "managed-hosting"].includes(scenario)) {
+    const id = "4be1c0d2a9f37e11";
+    applySessionEvent("session_open", { id, peerLabel: scenario === "hosting-unnamed" ? "desktop-3fa9c1d2" : "QA Workstation", transport: "relay-wss", kind: "adb" });
+    applySessionEvent("session_open", {
+      id: "5bf2d5b8a8c4f012",
+      peerLabel: scenario === "hosting-unnamed" ? "alice@northstar.example" : "Test Bench 02",
+      transport: state.managed ? "relay-wss" : "lan",
+      kind: scenario === "hosting-unnamed" ? "adb-pair" : "adb",
+    });
+    if (scenario === "path-down") applySessionEvent("path_down", { id, transport: "relay-wss" });
+    if (scenario === "path-lost") {
+      applySessionEvent("path_lost", { id });
+      applySessionEvent("session_close", { id, reason: "path_lost" });
+    }
+  }
   if (scenario === "adbd") {
     state.wireless = false;
     state.adbdWarning = true;
@@ -597,7 +739,7 @@ function applyPolicyPreview() {
   render({ headingFocus: true });
 }
 
-function runAction(action) {
+function runAction(action, control) {
   state.notice = null;
   if (action.startsWith("nav-")) {
     state.screen = action.slice(4);
@@ -671,6 +813,10 @@ function runAction(action) {
     case "open-notification":
       if (notificationVisible()) return openSheet("notification");
       return;
+    case "end-peer":
+      state.selectedSession = control.closest("[data-session-id]").dataset.sessionId;
+      return openSheet("end-peer");
+    case "confirm-end-peer": return endSessionPreview(state.selectedSession);
     case "show-android-pairing":
       if (state.host === "online" && path() === "wireless" && !state.adbdWarning) return openSheet("android-pairing");
       return;
@@ -724,6 +870,7 @@ function runAction(action) {
       return showDevice();
     case "simulate-reconnect":
       if (state.host !== "online") return;
+      clearSessions();
       state.host = "reconnecting";
       announce.textContent = "Setu SDK is restarting the agent.";
       return showDevice();
@@ -733,6 +880,16 @@ function runAction(action) {
       state.adbdWarning = !readyForHost();
       announce.textContent = "Setu host is online.";
       return showDevice();
+    case "simulate-path-down": case "simulate-path-up": case "simulate-path-lost": {
+      const session = state.sessions[0];
+      if (!session || state.host !== "online") return;
+      const type = action.slice("simulate-".length).replace("-", "_");
+      const transport = type === "path_up" && !state.managed ? "lan" : session.transport;
+      applySessionEvent(type, { id: session.id, transport });
+      if (type === "path_lost") applySessionEvent("session_close", { id: session.id, reason: "path_lost" });
+      announce.textContent = pathLabels[state.pathStatus.state];
+      return showDevice();
+    }
     case "simulate-lock":
       if (!state.fgsBackground) return;
       state.locked = true;
@@ -762,8 +919,8 @@ function runAction(action) {
 }
 
 document.addEventListener("click", (event) => {
-  const action = event.target.closest("button[data-action]")?.dataset.action;
-  if (action) runAction(action);
+  const control = event.target.closest("button[data-action]");
+  if (control) runAction(control.dataset.action, control);
 });
 
 document.addEventListener("change", (event) => {
