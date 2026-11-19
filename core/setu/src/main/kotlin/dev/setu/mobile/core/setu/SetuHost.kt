@@ -1,6 +1,7 @@
 package dev.setu.mobile.core.setu
 
 import dev.genadb.sdk.ConnectionState
+import dev.genadb.sdk.DeviceSession
 import dev.genadb.sdk.PolicyStatus
 import dev.genadb.sdk.SetuConfig
 import kotlinx.coroutines.flow.StateFlow
@@ -12,8 +13,12 @@ import kotlinx.coroutines.flow.StateFlow
 interface SetuHost {
     val connectionState: StateFlow<ConnectionState>
     val policyStatus: StateFlow<PolicyStatus>
+    val sessions: StateFlow<List<DeviceSession>>
 
-    fun start(config: SetuConfig)
+    /** A null [config] reuses the last one, matching the SDK. */
+    fun start(config: SetuConfig? = null)
 
     fun stop()
+
+    fun refreshPolicy(): PolicyStatus
 }
