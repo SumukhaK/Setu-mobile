@@ -1,124 +1,152 @@
-# Builder prompt · AT-04 · Battery and OEM readiness
+# Builder prompt · AT-05 · Guided setup UI
 
 You are the builder for one ticket in `SumukhaK/Setu-mobile`. Do this ticket only, open one PR, then stop.
 
 ## 0. Read first (in this order, nothing else)
 
-1. `docs/CODEBASE_MEMORY.md` (interfaces, AD-1 to AD-13; AD-13 is new for this ticket).
-2. `docs/TDD_TICKETS.md` §6 "AT-04".
-3. Setu-Desktop `docs/JOURNEYS.md` section J2, row "Battery and OEM policies", and acceptance row P04: https://github.com/SumukhaK/Setu-Desktop/blob/main/docs/JOURNEYS.md
-4. `docs/SCREENS.md` row A05 (consumes this in AT-05; not built here).
-5. The existing `:core:readiness` sources, especially `Readiness.kt`, `ReadinessTest.kt`, `NotificationCheck.kt` and `src/main/AndroidManifest.xml`.
+1. `docs/CODEBASE_MEMORY.md` (interfaces, AD-1 to AD-14; AD-14 is new for this ticket, and AD-9 applies now).
+2. `docs/TDD_TICKETS.md` §6 "AT-05".
+3. `docs/SCREENS.md` rows A02 to A05 and the ASCII layout at the top.
+4. Setu-Desktop `docs/JOURNEYS.md` section J2 and rows P04 and P05: https://github.com/SumukhaK/Setu-Desktop/blob/main/docs/JOURNEYS.md
+5. The `:core:readiness` public API (`detectSetupPath`, `readiness`, `DeviceChecks`, the readers, `oemOf`, `OemIntents`, `RecheckOnResume`) and `app/src/main/kotlin/dev/setu/mobile/MainActivity.kt` with its test.
 
 ## 1. Goal
 
-Extend `:core:readiness` with a battery-optimization check, a vendor (OEM) family detector and a resolver that lists the settings screens the guided setup (AT-05) can open. Add a `BATTERY` step to the readiness report. No UI, no navigation, no ViewModels, and nothing is launched in this ticket.
+Add a `:feature:setup` module with the guided setup screen. It shows the detected path, each readiness step with its state and one action, and rechecks when the user returns from Settings. `MainActivity` shows it under the existing "Setu" title. No hosting controls, no navigation library, no persistence and no DI.
 
 ## 2. Files (create or change only these)
 
 ```
-core/readiness/src/main/kotlin/dev/setu/mobile/core/readiness/BatteryCheck.kt          new
-core/readiness/src/main/kotlin/dev/setu/mobile/core/readiness/oem/Oem.kt               new
-core/readiness/src/main/kotlin/dev/setu/mobile/core/readiness/oem/OemIntents.kt        new
-core/readiness/src/main/kotlin/dev/setu/mobile/core/readiness/Readiness.kt             change: Step.BATTERY + DeviceChecks
-core/readiness/src/main/AndroidManifest.xml                                            change: <queries>
-core/readiness/src/test/kotlin/dev/setu/mobile/core/readiness/BatteryCheckTest.kt      new
-core/readiness/src/test/kotlin/dev/setu/mobile/core/readiness/oem/OemTest.kt           new
-core/readiness/src/test/kotlin/dev/setu/mobile/core/readiness/oem/OemIntentsTest.kt    new
-core/readiness/src/test/kotlin/dev/setu/mobile/core/readiness/ReadinessTest.kt         change: pass battery, add BATTERY cases
+settings.gradle.kts                    include(":feature:setup")
+gradle/libs.versions.toml              add androidx-lifecycle-viewmodel-compose and androidx-lifecycle-runtime-compose (version.ref androidxLifecycle); kotlinx-coroutines-test and turbine already exist
+config/detekt/detekt.yml               FunctionNaming: ignoreAnnotated: ['Composable']  (AD-9; this one key only)
+feature/setup/build.gradle.kts         android library + kotlin.compose plugin, namespace dev.setu.mobile.feature.setup; deps: :core:readiness, :core:setu, compose bom, ui, material3, activity-compose, lifecycle-viewmodel-compose, lifecycle-runtime-compose; copy lint block (incl. the three AD-8 checks), JVM 17 and Robolectric test options from core/readiness
+feature/setup/src/main/kotlin/dev/setu/mobile/feature/setup/DeviceProbe.kt
+feature/setup/src/main/kotlin/dev/setu/mobile/feature/setup/SetupViewModel.kt
+feature/setup/src/main/kotlin/dev/setu/mobile/feature/setup/SetupScreen.kt
+feature/setup/src/main/kotlin/dev/setu/mobile/feature/setup/SettingsIntents.kt
+feature/setup/src/main/kotlin/dev/setu/mobile/feature/setup/MiuiInstallHelp.kt
+feature/setup/src/main/kotlin/dev/setu/mobile/feature/setup/steps/StepRow.kt           shared row: title, state chip, one action
+feature/setup/src/main/kotlin/dev/setu/mobile/feature/setup/steps/UsbBootstrapStep.kt  the USB instructions + unplug gate
+feature/setup/src/main/kotlin/dev/setu/mobile/feature/setup/steps/BatteryStep.kt       battery state + OEM destinations
+feature/setup/src/main/res/values/strings.xml          every user-visible string
+feature/setup/src/test/kotlin/dev/setu/mobile/feature/setup/SetupViewModelTest.kt
+feature/setup/src/test/kotlin/dev/setu/mobile/feature/setup/SetupContentTest.kt
+feature/setup/src/test/kotlin/dev/setu/mobile/feature/setup/SetupScreenRecheckTest.kt
+app/build.gradle.kts                   implementation(project(":feature:setup"))
+app/src/main/kotlin/dev/setu/mobile/MainActivity.kt    title "Setu" + SetupScreen below it
 ```
 
-No new Gradle dependencies. Don't touch `:app`, `:core:setu`, `docs/` or the prototype.
+Developer options, Wireless debugging and Notifications use `StepRow` directly inside `SetupScreen.kt`. Only USB and Battery have enough content for their own files. Don't change `:core:readiness`, `:core:setu`, `HostingService`, `docs/` or the prototype.
 
 ## 3. Contract to implement (decided by the architect; do not reinterpret)
 
-**`BatteryCheck.kt`.** `class BatteryCheck(context: Context) { fun ignoringOptimizations(): Tri }`: `PowerManager.isIgnoringBatteryOptimizations(context.packageName)` true → YES, false → NO. No permission is needed to read it. Never request the exemption (no `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`, no `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` permission).
-
-**`oem/Oem.kt`.** This is pure:
+**`DeviceProbe.kt`.**
 
 ```kotlin
-enum class Oem { XIAOMI, SAMSUNG, COLOROS, OTHER }
+data class DeviceSnapshot(val sdkInt: Int, val onWifi: Boolean, val checks: DeviceChecks, val oem: Oem)
 
-fun oemOf(manufacturer: String, brand: String): Oem
+fun interface DeviceProbe { fun read(): DeviceSnapshot }
+
+class AndroidDeviceProbe(private val context: Context) : DeviceProbe
 ```
 
-Match case-insensitively on either string:
-- `xiaomi`, `redmi`, `poco` → XIAOMI
-- `samsung` → SAMSUNG
-- `oppo`, `realme`, `oneplus` → COLOROS
-- anything else → OTHER
+`AndroidDeviceProbe.read()` builds the snapshot from:
+- `Build.VERSION.SDK_INT`
+- `NetworkReader.onWifi()`
+- the four checks (`DeveloperOptionsCheck`, `WirelessDebuggingCheck`, `NotificationCheck`, `BatteryCheck`)
+- `oemOf(Build.MANUFACTURER, Build.BRAND)`
 
-The platform call site is `oemOf(Build.MANUFACTURER, Build.BRAND)`, done by the caller (AT-05). Don't read `Build` inside `oemOf`.
+It has no logic beyond that wiring, so it needs no test.
 
-**`oem/OemIntents.kt`.**
+**`SetupViewModel.kt`.**
 
 ```kotlin
-enum class Purpose { AUTOSTART, BATTERY, APP_DETAILS }
-data class SettingsDestination(val purpose: Purpose, val intent: Intent, val vendorSpecific: Boolean)
+data class SetupUiState(val report: ReadinessReport, val oem: Oem, val canUnplugUsb: Boolean)
 
-class OemIntents(private val context: Context) {
-    fun destinations(oem: Oem): List<SettingsDestination>
+class SetupViewModel(
+    private val probe: DeviceProbe,
+    private val usbFallbackAllowed: Boolean,
+    connectionState: StateFlow<ConnectionState>,
+) : ViewModel() {
+    val uiState: StateFlow<SetupUiState>
+    fun recheck()
 }
 ```
 
-Build the list in this order and keep only entries whose `intent.resolveActivity(packageManager) != null`, except the last one:
-1. Vendor candidates for `oem` (`vendorSpecific = true`), as explicit components:
-   - XIAOMI:
-     - AUTOSTART `com.miui.securitycenter/com.miui.permcenter.autostart.AutoStartManagementActivity`
-     - BATTERY `com.miui.powerkeeper/com.miui.powerkeeper.ui.HiddenAppsConfigActivity` with extras `package_name` = own package and `package_label` = the app label
-   - SAMSUNG:
-     - BATTERY `com.samsung.android.lool/com.samsung.android.sm.battery.ui.BatteryActivity`
-     - BATTERY `com.samsung.android.lool/com.samsung.android.sm.ui.battery.BatteryActivity`
-   - COLOROS:
-     - AUTOSTART `com.coloros.safecenter/com.coloros.safecenter.permission.startup.StartupAppListActivity`
-     - AUTOSTART `com.coloros.safecenter/com.coloros.safecenter.startupapp.StartupAppListActivity`
-     - AUTOSTART `com.oppo.safe/com.oppo.safe.permission.startup.StartupAppListActivity`
-   - OTHER: none.
-2. System battery list: `Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS`, BATTERY, `vendorSpecific = false`.
-3. App details, which is always present, never resolve-filtered and always last: `Settings.ACTION_APPLICATION_DETAILS_SETTINGS` with `Uri.fromParts("package", packageName, null)`, APP_DETAILS, `vendorSpecific = false`.
+- The VM holds the latest `DeviceSnapshot` in a `MutableStateFlow`. Read it once in `init`, and again on every `recheck()`.
+- `uiState` = `combine(snapshot, connectionState)`, mapped to `SetupUiState`:
+  - `report = readiness(detectSetupPath(sdkInt, onWifi, usbFallbackAllowed), snapshot.checks, state)`
+  - `oem = snapshot.oem`
+  - `canUnplugUsb = report.path == SetupPath.UsbTcpip && report.steps[Step.USB_TCPIP_ENDPOINT] == Tri.YES`
+- Use `stateIn(viewModelScope, SharingStarted.Eagerly, <initial computed from the first snapshot and connectionState.value>)`.
+- No other logic lives in the VM. `readiness()` owns the rules.
 
-The vendor component names are best effort. Resolution is the safety net, so an unknown ROM simply drops them. Keep the candidate table a private `val`/`when` in the file; no config files and no reflection.
+**`SettingsIntents.kt`.** These are plain functions returning `Intent`, with no resolution and no launching:
+- `developerOptionsIntent(enabled: Tri)`: `ACTION_APPLICATION_DEVELOPMENT_SETTINGS` when YES, else `ACTION_DEVICE_INFO_SETTINGS`. The step text tells the user to tap Build number seven times.
+- `wirelessDebuggingIntent()`: `ACTION_APPLICATION_DEVELOPMENT_SETTINGS`. There is no public deep link to the Wireless debugging page.
+- `appNotificationSettingsIntent(packageName)`: `ACTION_APP_NOTIFICATION_SETTINGS` with `EXTRA_APP_PACKAGE`.
 
-**`AndroidManifest.xml`.** Package visibility (API 30+) hides other apps from `resolveActivity` unless declared. Add one `<queries>` block with:
-- `<package>` entries for `com.miui.securitycenter`, `com.miui.powerkeeper`, `com.samsung.android.lool`, `com.coloros.safecenter` and `com.oppo.safe`
-- an `<intent>` for the action `android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS`
+**`SetupScreen.kt`.**
+- `@Composable fun SetupScreen(viewModel: SetupViewModel)` is the stateful wrapper. It:
+  - collects `uiState` with `collectAsStateWithLifecycle()`
+  - attaches `RecheckOnResume(viewModel::recheck)` to `LocalLifecycleOwner.current.lifecycle` inside a `DisposableEffect`, removing the observer on dispose
+  - builds `OemIntents(context).destinations(state.oem)` with `remember(state.oem)`
+  - launches intents with `context.startActivity`
+  - on API 33+, when notifications are NO, requests `POST_NOTIFICATIONS` with `rememberLauncherForActivityResult(RequestPermission())`. Below 33 it opens `appNotificationSettingsIntent`.
+- `@Composable fun SetupContent(state: SetupUiState, destinations: List<SettingsDestination>, actions: SetupActions)` is stateless and is what tests render. Define `SetupActions` as a small data class of lambdas (`openDeveloperOptions`, `openWirelessDebugging`, `fixNotifications`, `open(SettingsDestination)`).
+- Content, top to bottom:
+  1. **Path header.** It shows "Wireless debugging (Android 11+ on Wi-Fi)" or "USB setup (Android 10 or no Wi-Fi)". For `Unsupported`, show only the message "This phone can't use the USB fallback here. Contact IT or connect to a supported Wi-Fi network." and nothing else below it.
+  2. **One `StepRow` per entry in `report.steps`, in `Step` order.** The chip text is "Done", "Needed" or "Not checked yet" for YES, NO and UNKNOWN.
+     - DEVELOPER_OPTIONS: action "Open settings".
+     - WIRELESS_DEBUGGING: the text says Android's pairing dialog shows a six-digit code and port that the tester reads to the developer, who enters them on the desktop. The app never asks for that code. Action "Open developer options".
+     - USB_TCPIP_ENDPOINT: `UsbBootstrapStep`.
+     - NOTIFICATIONS: action "Allow notifications", with the note "Hosting still works without them, but you won't see its status."
+     - BATTERY: `BatteryStep`.
+     - AGENT_REACHES_ADBD: no action. The text is "Checked once hosting starts."
+  3. **`MiuiInstallHelp`**, only when `oem == Oem.XIAOMI`.
+- **`UsbBootstrapStep`.** It lists these steps:
+  1. Connect USB to an approved computer.
+  2. Allow USB debugging on the phone.
+  3. On the computer, run `adb tcpip 5555`.
+  4. Keep the cable connected until Setu confirms.
 
-Don't use `QUERY_ALL_PACKAGES`.
+  Below the steps, show "Don't unplug yet: waiting for the phone to report 127.0.0.1:5555." when `!canUnplugUsb`, and "Setup confirmed. You can unplug the USB cable." when it is true. Add a one-line caution: "Use only trusted networks. Don't forward port 5555."
+- **`BatteryStep`.** It shows the battery state. It lists one button per destination, labelled by purpose ("Autostart settings", "Battery settings", "App info") and suffixed with "(phone maker)" when `vendorSpecific`. It adds the note "Some phone makers add extra switches we can't check. Turn off restrictions for Setu if you see them." There is no confirm checkbox (AD-13).
+- **`MiuiInstallHelp`** is an expandable card titled "Install failed on a Xiaomi phone?". The body says that if installing shows `INSTALL_FAILED_USER_RESTRICTED`, the user should turn on **Install via USB** and **USB debugging (Security settings)** in Developer options where IT approves. It has an action to open developer options.
 
-**`Readiness.kt`.** Add `BATTERY` to `Step` (append it after `NOTIFICATIONS`, so the order reads DEVELOPER_OPTIONS, WIRELESS_DEBUGGING, USB_TCPIP_ENDPOINT, NOTIFICATIONS, BATTERY, AGENT_REACHES_ADBD). Group the four device checks so the function stays under detekt's `LongParameterList` threshold (6), which data classes are exempt from:
+**`MainActivity.kt`.** Keep the "Setu" title text and put `SetupScreen` under it. Build the VM with:
 
 ```kotlin
-data class DeviceChecks(val developerOptions: Tri, val wirelessDebugging: Tri, val notifications: Tri, val battery: Tri)
-
-fun readiness(path: SetupPath, checks: DeviceChecks, state: ConnectionState): ReadinessReport
+viewModel { SetupViewModel(AndroidDeviceProbe(applicationContext), usbFallbackAllowed = true, connectionState = MutableStateFlow(ConnectionState.Idle)) }
 ```
 
-`DeviceChecks` has no defaults in production code. Both supported paths include `BATTERY`; `Unsupported` stays empty. `BATTERY: NO` counts as NO in `ready`, exactly like `NOTIFICATIONS`. Don't special-case it. The rules in `readiness()` are otherwise unchanged. Don't touch `config/detekt/detekt.yml`.
-
-OEM switches (autostart, Never sleeping apps, MIUI "No restrictions") can't be read, so they are **not** steps (AD-13).
+There are two placeholders, one per later ticket. `usbFallbackAllowed` stays fixed until AT-09 (AD-12). The connection state stays `Idle` until AT-06 (AD-14). Leave a one-line comment on each that names the ticket. Don't add a holder, a singleton or a service change.
 
 ## 4. TDD: write these tests first, see them fail, then implement
 
-Map each test to its acceptance ID in a comment. Use JUnit 4. Use Robolectric (`@Config(sdk = [35])` unless stated) only for platform classes.
+Map each test to its acceptance ID in a comment. Use JUnit 4, Robolectric `@Config(sdk = [35])` for Compose, and coroutines-test (`runTest`, plus `Dispatchers.setMain` with a test dispatcher) and Turbine for the VM. Use a fake `DeviceProbe` whose snapshot the test can change and that counts reads.
 
-- **`OemTest` (pure, P04 OEM):** a table covering:
-  - `("Xiaomi","Redmi")`, `("Xiaomi","POCO")` and `("XIAOMI","xiaomi")` → XIAOMI
-  - `("samsung","samsung")` → SAMSUNG
-  - `("OPPO","OPPO")`, `("realme","realme")` and `("OnePlus","OnePlus")` → COLOROS
-  - `("Google","google")` → OTHER
-  - `("unknown","redmi")` → XIAOMI (the brand alone is enough)
-- **`BatteryCheckTest` (Robolectric):** use `shadowOf(powerManager).setIgnoringBatteryOptimizations(packageName, true/false)` and check true → YES and false → NO.
-- **`OemIntentsTest` (Robolectric, P04 OEM):**
-  - **OTHER with nothing registered:** the list is exactly `[APP_DETAILS]`, and its data URI is `package:<own package>`.
-  - **XIAOMI with both MIUI components registered** (`shadowOf(packageManager).addActivityIfNotPresent(component)`, plus an intent filter or resolve info if Robolectric needs it to resolve an explicit component): the list starts with the AUTOSTART then the BATTERY vendor entries, then `APP_DETAILS` last. Check that the BATTERY entry carries `package_name`.
-  - **XIAOMI with nothing registered:** the vendor entries are dropped and only `APP_DETAILS` remains.
-  - **SAMSUNG with only the second BatteryActivity registered:** exactly that one vendor entry appears.
-  - **System battery settings resolvable** (register an activity for the action): it appears with `vendorSpecific = false`, before `APP_DETAILS`.
-- **`ReadinessTest` (pure):**
-  - Update existing calls to build `DeviceChecks` (a test-only helper with `battery = Tri.YES` is fine) so their assertions are unchanged.
-  - Add these cases: both paths contain `BATTERY`; `battery = NO` gives `ready == false`; `battery = UNKNOWN` with everything else YES or UNKNOWN gives `ready == true`; `Unsupported` stays empty.
-
-If Robolectric cannot make an explicit component resolve after you register it, stop and report the exact behaviour in the PR. Don't change the production rule to suit the test.
+- **`SetupViewModelTest` (P04):**
+  - sdk 35 on Wi-Fi gives the Wireless path, with the five Wireless steps in `Step` order.
+  - sdk 29 gives the USB path, and `canUnplugUsb == false` while the connection is `Idle`.
+  - Emitting `Online(adbdEndpoint = "127.0.0.1:5555")` flips `canUnplugUsb` to true without a recheck.
+  - Emitting `"127.0.0.1:5556"` keeps it false.
+  - Cellular with `usbFallbackAllowed = false` gives `Unsupported` and an empty step map.
+  - `recheck()` re-reads the probe. Change the fake to developer options YES, call `recheck()`, and the step becomes YES.
+  - `init` reads the probe exactly once.
+- **`SetupContentTest` (Robolectric Compose, `createComposeRule`):**
+  - P04: `Unsupported` shows the Contact IT message and no step rows.
+  - P04: the USB path with `canUnplugUsb = false` shows "Don't unplug yet", and with true it shows "You can unplug".
+  - P04 OEM: XIAOMI shows "Install failed on a Xiaomi phone?", and OTHER doesn't.
+  - P04 OEM: with destinations `[vendor BATTERY, APP_DETAILS]`, clicking "Battery settings (phone maker)" calls `open` with that destination.
+  - P06: notifications NO shows "Allow notifications" plus the "Hosting still works" note, and clicking it calls `fixNotifications`.
+  - P05 (phone half, partial): no node has a set-text action (`onAllNodes(hasSetTextAction()).assertCountEquals(0)`) on either path.
+- **`SetupScreenRecheckTest` (P04 recheck on return):**
+  1. Use `createAndroidComposeRule<ComponentActivity>()` and set `SetupScreen(vm)` with the fake probe.
+  2. Move the activity to CREATED and then back to RESUMED via `activityRule.scenario.moveToState(...)`.
+  3. Assert the probe read count increased by at least one more than the initial reads.
+- **The existing `MainActivityTest` (P01) must stay green unchanged.**
 
 ## 5. Gates (all must pass before you push)
 
@@ -127,22 +155,22 @@ If Robolectric cannot make an explicit component resolve after you register it, 
 ./gradlew :app:assembleDebug
 ```
 
-Use no `@Suppress`, no baselines, and disable no new lint checks (AD-8). If lint objects to `<queries>` or a component string, stop and report the exact error.
+Use no `@Suppress`, no baselines, and disable no new lint checks (AD-8). The only detekt config change allowed is the AD-9 `FunctionNaming` key. If another detekt rule fires on a composable (for example `LongMethod` or `LongParameterList`), split the composable. Don't change the config. If lint objects to anything you can't fix in code, stop and report the exact error.
 
 ## 6. Architecture and Karpathy pillars (enforced at review)
 
-- **Clean Architecture and SOLID.** `oemOf` and `readiness` are pure domain functions. `BatteryCheck` and `OemIntents` are thin data sources that take `Context`. `OemIntents` builds and filters intents but never calls `startActivity`. AT-05 launches them.
-1. **Think before coding.** The PR description opens with `## Assumptions & Trade-offs`. If J2, P04, this prompt and the platform disagree, stop and ask.
-2. **Simplicity first.** Write the minimum code: no DI, no Flows, no caching, no OEM settings reads, no MIUI sheet (AT-05), no "tester confirmed" state (AT-05). Keep files under ~250–300 lines; most should be under 80.
-3. **Surgical changes.** Touch only the files in §2. Branch from latest `main` as `feature/AT-04-battery-oem-readiness`. Make atomic conventional commits (`test(android): …` red first, then `feat(android): …`).
+- **Clean Architecture and SOLID.** UI (`SetupContent`) → ViewModel (`SetupViewModel`, `StateFlow`, UDF) → domain (`detectSetupPath`, `readiness` from `:core:readiness`) → data (`DeviceProbe` over the readers). The VM has no `Context`. Composables hold no rules: everything that decides YES, NO, UNKNOWN or unplug comes from `SetupUiState`.
+1. **Think before coding.** The PR description opens with `## Assumptions & Trade-offs`. If J2, P04, SCREENS A02 to A05, this prompt and the platform disagree, stop and ask.
+2. **Simplicity first.** Write the minimum code: no navigation library, no DI, no persistence, no Start hosting button (AT-06), no pairing guide screen (AT-08), no animations, no theming work beyond `MaterialTheme`. Keep files under ~250–300 lines and composables short.
+3. **Surgical changes.** Touch only the files in §2. Branch from latest `main` as `feature/AT-05-guided-setup-ui`. Make atomic conventional commits (`test(android): …` red first, then `feat(android): …`).
 4. **Goal-driven TDD.** Commit the failing tests first, then the implementation. Paste the exact gate output in the PR.
 
 ## 7. PR and hard stop
 
-Open one PR against `main` titled `feat(android): AT-04 battery and OEM readiness`, with this body:
+Open one PR against `main` titled `feat(android): AT-05 guided setup UI`, with this body:
 
 ```
-Ticket: AT-04 (docs/TDD_TICKETS.md §6) · Acceptance: P04 (OEM and battery readiness)
+Ticket: AT-05 (docs/TDD_TICKETS.md §6) · Acceptance: P04 (guided setup end to end with fakes), P05 phone half (partial), P06 (notification denial copy)
 
 ## Assumptions & Trade-offs
 - …
@@ -155,7 +183,7 @@ Ticket: AT-04 (docs/TDD_TICKETS.md §6) · Acceptance: P04 (OEM and battery read
 <full green output of ./gradlew testDebugUnitTest detekt lint and :app:assembleDebug>
 
 ## Out of scope (left for later tickets)
-- setup UI, MIUI install sheet, tester-confirmed OEM switches, launching destinations, RecheckOnResume wiring (AT-05); EMM source of usbFallbackAllowed (AT-09)
+- live ConnectionState and Start hosting (AT-06), system pairing guide (AT-08), EMM usbFallbackAllowed (AT-09), persisted settings (AT-10)
 ```
 
-Then **stop immediately**. Don't start AT-05, don't edit `docs/`, and don't merge.
+Then **stop immediately**. Don't start AT-06, don't edit `docs/`, and don't merge.

@@ -13,7 +13,7 @@ Updated by the post-merge ritual. Desktop (DT-*) status is tracked in Setu-Deskt
 - [x] AT-01 · Project scaffold and SDK test seam · Done in [#4](https://github.com/SumukhaK/Setu-mobile/pull/4)
 - [x] AT-02 · Hosting foreground service and notification · Done in [#6](https://github.com/SumukhaK/Setu-mobile/pull/6)
 - [x] AT-03 · Readiness engine · Done in [#8](https://github.com/SumukhaK/Setu-mobile/pull/8)
-- [ ] AT-04 · Battery and OEM readiness, MIUI install recovery
+- [x] AT-04 · Battery and OEM readiness, MIUI install recovery · Done in [#12](https://github.com/SumukhaK/Setu-mobile/pull/12)
 - [ ] AT-05 · Guided setup UI
 - [ ] AT-06 · Solo hosting screen
 - [ ] AT-07 · Connected desktops and End session
@@ -280,9 +280,9 @@ The repos are still wireframes, so the tickets fix a stack. Change it once, here
 - **SDK binding:** none (platform only).
 
 ### AT-05 · Guided setup UI
-- **Files:** `feature/setup/SetupScreen.kt`, `SetupViewModel.kt`, `steps/*.kt` (Developer options, Wireless debugging, USB tcpip bootstrap with endpoint check, notifications, battery and OEM destinations from AT-04), `MiuiInstallSheet.kt` (moved from AT-04, shown for `Oem.XIAOMI`), attaches `RecheckOnResume`.
-- **Tests first:** P04 end to end with fakes; the USB branch requires `Online.adbdEndpoint == 127.0.0.1:5555` before "unplug".
-- **SDK binding:** `connectionState`, `Online.adbdEndpoint`.
+- **Files:** new `:feature:setup` module: `DeviceProbe.kt` (one snapshot of the AT-03/AT-04 readers), `SetupViewModel.kt`, `SetupScreen.kt` (stateful wrapper + stateless `SetupContent`), `SettingsIntents.kt`, `steps/*.kt` (Developer options, Wireless debugging, USB tcpip bootstrap with endpoint check, notifications, battery and OEM destinations), `MiuiInstallHelp.kt` (moved from AT-04, shown for `Oem.XIAOMI`). Attaches `RecheckOnResume`. `MainActivity` shows the setup screen.
+- **Tests first:** P04 end to end with fakes; the USB branch requires `Online.adbdEndpoint == 127.0.0.1:5555` before "unplug"; Unsupported shows the IT/Wi-Fi message; resume re-reads the device; no text field for any code (P05 phone half, partial).
+- **SDK binding:** `ConnectionState` (injected `StateFlow`; the live flow from hosting is wired in AT-06, CODEBASE_MEMORY AD-14), `Online.adbdEndpoint`.
 
 ### AT-06 · Solo hosting screen
 - **Files:** `feature/host/HostScreen.kt`, `HostViewModel.kt`.
