@@ -1,154 +1,169 @@
-# Builder prompt · AT-05 · Guided setup UI
+# Builder prompt · AT-06 · Solo hosting screen
 
 You are the builder for one ticket in `SumukhaK/Setu-mobile`. Do this ticket only, open one PR, then stop.
 
 ## 0. Read first (in this order, nothing else)
 
-1. `docs/CODEBASE_MEMORY.md` (interfaces, AD-1 to AD-14; AD-14 is new for this ticket, and AD-9 applies now).
-2. `docs/TDD_TICKETS.md` §6 "AT-05".
-3. `docs/SCREENS.md` rows A02 to A05 and the ASCII layout at the top.
-4. Setu-Desktop `docs/JOURNEYS.md` section J2 and rows P04 and P05: https://github.com/SumukhaK/Setu-Desktop/blob/main/docs/JOURNEYS.md
-5. The `:core:readiness` public API (`detectSetupPath`, `readiness`, `DeviceChecks`, the readers, `oemOf`, `OemIntents`, `RecheckOnResume`) and `app/src/main/kotlin/dev/setu/mobile/MainActivity.kt` with its test.
+1. `docs/CODEBASE_MEMORY.md` (interfaces, AD-1 to AD-15; AD-15 is new for this ticket, and the copy rule under Open items applies).
+2. `docs/TDD_TICKETS.md` §6 "AT-06".
+3. `docs/SCREENS.md` row A06 and the ASCII layout ("Prepare ── Host").
+4. Setu-Desktop `docs/JOURNEYS.md` rows P03 and P17: https://github.com/SumukhaK/Setu-Desktop/blob/main/docs/JOURNEYS.md
+5. Setu-SDK v1.1.0 `API_SPEC.md` §4 (`SetuManager.pair`, `ConnectionState`, `Reconnecting`): https://github.com/SumukhaK/Setu/blob/v1.1.0/API_SPEC.md
+6. Existing code: `SetuHost`, `SetuManagerHost`, `HostingService`, `FakeSetuHost`, `MainActivity`, `:feature:setup` (as the module pattern to copy).
 
 ## 1. Goal
 
-Add a `:feature:setup` module with the guided setup screen. It shows the detected path, each readiness step with its state and one action, and rechecks when the user returns from Settings. `MainActivity` shows it under the existing "Setu" title. No hosting controls, no navigation library, no persistence and no DI.
+The phone can start and stop Solo hosting from the app, and it shows the live state, device ID and the agent's current pairing code. The live SDK state also feeds the setup screen, replacing AT-05's `Idle` placeholder. There are no sessions list (AT-07), no recovery screens (AT-08), no managed screens (AT-09) and no settings (AT-10).
 
 ## 2. Files (create or change only these)
 
 ```
-settings.gradle.kts                    include(":feature:setup")
-gradle/libs.versions.toml              add androidx-lifecycle-viewmodel-compose and androidx-lifecycle-runtime-compose (version.ref androidxLifecycle); kotlinx-coroutines-test and turbine already exist
-config/detekt/detekt.yml               FunctionNaming: ignoreAnnotated: ['Composable']  (AD-9; this one key only)
-feature/setup/build.gradle.kts         android library + kotlin.compose plugin, namespace dev.setu.mobile.feature.setup; deps: :core:readiness, :core:setu, compose bom, ui, material3, activity-compose, lifecycle-viewmodel-compose, lifecycle-runtime-compose; copy lint block (incl. the three AD-8 checks), JVM 17 and Robolectric test options from core/readiness
-feature/setup/src/main/kotlin/dev/setu/mobile/feature/setup/DeviceProbe.kt
-feature/setup/src/main/kotlin/dev/setu/mobile/feature/setup/SetupViewModel.kt
-feature/setup/src/main/kotlin/dev/setu/mobile/feature/setup/SetupScreen.kt
-feature/setup/src/main/kotlin/dev/setu/mobile/feature/setup/SettingsIntents.kt
-feature/setup/src/main/kotlin/dev/setu/mobile/feature/setup/MiuiInstallHelp.kt
-feature/setup/src/main/kotlin/dev/setu/mobile/feature/setup/steps/StepRow.kt           shared row: title, state chip, one action
-feature/setup/src/main/kotlin/dev/setu/mobile/feature/setup/steps/UsbBootstrapStep.kt  the USB instructions + unplug gate
-feature/setup/src/main/kotlin/dev/setu/mobile/feature/setup/steps/BatteryStep.kt       battery state + OEM destinations
-feature/setup/src/main/res/values/strings.xml          every user-visible string
-feature/setup/src/test/kotlin/dev/setu/mobile/feature/setup/SetupViewModelTest.kt
-feature/setup/src/test/kotlin/dev/setu/mobile/feature/setup/SetupContentTest.kt
-feature/setup/src/test/kotlin/dev/setu/mobile/feature/setup/SetupScreenRecheckTest.kt
-app/build.gradle.kts                   implementation(project(":feature:setup"))
-app/src/main/kotlin/dev/setu/mobile/MainActivity.kt    title "Setu" + SetupScreen below it
+core/setu/src/main/kotlin/dev/setu/mobile/core/setu/SetuHost.kt          + suspend fun pair(timeoutMs: Long = 30_000): String
+core/setu/src/main/kotlin/dev/setu/mobile/core/setu/SetuManagerHost.kt   delegate pair()
+app/src/test/kotlin/dev/setu/mobile/service/FakeSetuHost.kt              implement pair() (scripted result or error, call count)
+app/src/main/kotlin/dev/setu/mobile/service/HostingRegistry.kt           new (AD-15)
+app/src/main/kotlin/dev/setu/mobile/service/HostingService.kt            attach after createHost(), detach in onDestroy (2 lines)
+app/src/test/kotlin/dev/setu/mobile/service/HostingRegistryTest.kt       new
+settings.gradle.kts                                                      include(":feature:host")
+gradle/libs.versions.toml                                                add androidx-compose-ui-test-manifest (no version; BOM) and use it in feature/setup too
+feature/setup/build.gradle.kts                                           swap the inline ui-test-manifest coordinate for the catalog entry (that one line only)
+feature/host/build.gradle.kts                                            copy feature/setup's (namespace dev.setu.mobile.feature.host; deps :core:setu, compose, lifecycle; no :core:readiness)
+feature/host/src/main/kotlin/dev/setu/mobile/feature/host/HostViewModel.kt
+feature/host/src/main/kotlin/dev/setu/mobile/feature/host/HostScreen.kt
+feature/host/src/main/res/values/strings.xml
+feature/host/src/test/kotlin/dev/setu/mobile/feature/host/HostViewModelTest.kt
+feature/host/src/test/kotlin/dev/setu/mobile/feature/host/HostContentTest.kt
+app/build.gradle.kts                                                     buildConfig on; BuildConfig.SETU_RELAY_URL; implementation(project(":feature:host"))
+app/src/main/kotlin/dev/setu/mobile/MainActivity.kt                      Prepare / Host tabs; live state into both VMs
 ```
 
-Developer options, Wireless debugging and Notifications use `StepRow` directly inside `SetupScreen.kt`. Only USB and Battery have enough content for their own files. Don't change `:core:readiness`, `:core:setu`, `HostingService`, `docs/` or the prototype.
+Don't change `:core:readiness`, the rest of `:feature:setup`, `docs/` or the prototype.
 
 ## 3. Contract to implement (decided by the architect; do not reinterpret)
 
-**`DeviceProbe.kt`.**
+**`SetuHost.pair`.** Add `suspend fun pair(timeoutMs: Long = 30_000): String` and have `SetuManagerHost` delegate to `SetuManager.pair(timeoutMs)`. This is delegation only, so it needs no new `:core:setu` test.
+
+**`HostingRegistry.kt` (AD-15).**
 
 ```kotlin
-data class DeviceSnapshot(val sdkInt: Int, val onWifi: Boolean, val checks: DeviceChecks, val oem: Oem)
-
-fun interface DeviceProbe { fun read(): DeviceSnapshot }
-
-class AndroidDeviceProbe(private val context: Context) : DeviceProbe
-```
-
-`AndroidDeviceProbe.read()` builds the snapshot from:
-- `Build.VERSION.SDK_INT`
-- `NetworkReader.onWifi()`
-- the four checks (`DeveloperOptionsCheck`, `WirelessDebuggingCheck`, `NotificationCheck`, `BatteryCheck`)
-- `oemOf(Build.MANUFACTURER, Build.BRAND)`
-
-It has no logic beyond that wiring, so it needs no test.
-
-**`SetupViewModel.kt`.**
-
-```kotlin
-data class SetupUiState(val report: ReadinessReport, val oem: Oem, val canUnplugUsb: Boolean)
-
-class SetupViewModel(
-    private val probe: DeviceProbe,
-    private val usbFallbackAllowed: Boolean,
-    connectionState: StateFlow<ConnectionState>,
-) : ViewModel() {
-    val uiState: StateFlow<SetupUiState>
-    fun recheck()
+object HostingRegistry {
+    val connectionState: StateFlow<ConnectionState>   // attached host's state, else Idle
+    suspend fun pair(): String                        // attached host's pair(); IllegalStateException("not hosting") if none
+    internal fun attach(host: SetuHost)
+    internal fun detach(host: SetuHost)               // no-op unless host is the attached one
 }
 ```
 
-- The VM holds the latest `DeviceSnapshot` in a `MutableStateFlow`. Read it once in `init`, and again on every `recheck()`.
-- `uiState` = `combine(snapshot, connectionState)`, mapped to `SetupUiState`:
-  - `report = readiness(detectSetupPath(sdkInt, onWifi, usbFallbackAllowed), snapshot.checks, state)`
-  - `oem = snapshot.oem`
-  - `canUnplugUsb = report.path == SetupPath.UsbTcpip && report.steps[Step.USB_TCPIP_ENDPOINT] == Tri.YES`
-- Use `stateIn(viewModelScope, SharingStarted.Eagerly, <initial computed from the first snapshot and connectionState.value>)`.
-- No other logic lives in the VM. `readiness()` owns the rules.
+- Back it with `MutableStateFlow<SetuHost?>(null)`. `connectionState` is `flatMapLatest { it?.connectionState ?: flowOf(Idle) }.stateIn(<registry scope>, SharingStarted.Eagerly, Idle)`, with the registry scope being `CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)`.
+- `HostingService.onCreate` calls `attach(host)` right after `createHost()`. `onDestroy` calls `detach(host)` after `host.stop()`. Change nothing else in the service.
+- Nothing in the UI calls `SetuManager.getInstance` (AD-15).
 
-**`SettingsIntents.kt`.** These are plain functions returning `Intent`, with no resolution and no launching:
-- `developerOptionsIntent(enabled: Tri)`: `ACTION_APPLICATION_DEVELOPMENT_SETTINGS` when YES, else `ACTION_DEVICE_INFO_SETTINGS`. The step text tells the user to tap Build number seven times.
-- `wirelessDebuggingIntent()`: `ACTION_APPLICATION_DEVELOPMENT_SETTINGS`. There is no public deep link to the Wireless debugging page.
-- `appNotificationSettingsIntent(packageName)`: `ACTION_APP_NOTIFICATION_SETTINGS` with `EXTRA_APP_PACKAGE`.
+**`app/build.gradle.kts`.** Add `buildFeatures { buildConfig = true }` and `buildConfigField("String", "SETU_RELAY_URL", "\"${providers.gradleProperty("setu.relayUrl").getOrElse("")}\"")`. Don't add a value to `gradle.properties`: an empty string means "no relay configured in this build".
 
-**`SetupScreen.kt`.**
-- `@Composable fun SetupScreen(viewModel: SetupViewModel)` is the stateful wrapper. It:
-  - collects `uiState` with `collectAsStateWithLifecycle()`
-  - attaches `RecheckOnResume(viewModel::recheck)` to `LocalLifecycleOwner.current.lifecycle` inside a `DisposableEffect`, removing the observer on dispose
-  - builds `OemIntents(context).destinations(state.oem)` with `remember(state.oem)`
-  - launches intents with `context.startActivity`
-  - on API 33+, when notifications are NO, requests `POST_NOTIFICATIONS` with `rememberLauncherForActivityResult(RequestPermission())`. Below 33 it opens `appNotificationSettingsIntent`.
-- `@Composable fun SetupContent(state: SetupUiState, destinations: List<SettingsDestination>, actions: SetupActions)` is stateless and is what tests render. Define `SetupActions` as a small data class of lambdas (`openDeveloperOptions`, `openWirelessDebugging`, `fixNotifications`, `open(SettingsDestination)`).
-- Content, top to bottom:
-  1. **Path header.** It shows "Wireless debugging (Android 11+ on Wi-Fi)" or "USB setup (Android 10 or no Wi-Fi)". For `Unsupported`, show only the message "This phone can't use the USB fallback here. Contact IT or connect to a supported Wi-Fi network." and nothing else below it.
-  2. **One `StepRow` per entry in `report.steps`, in `Step` order.** The chip text is "Done", "Needed" or "Not checked yet" for YES, NO and UNKNOWN.
-     - DEVELOPER_OPTIONS: action "Open settings".
-     - WIRELESS_DEBUGGING: the text says Android's pairing dialog shows a six-digit code and port that the tester reads to the developer, who enters them on the desktop. The app never asks for that code. Action "Open developer options".
-     - USB_TCPIP_ENDPOINT: `UsbBootstrapStep`.
-     - NOTIFICATIONS: action "Allow notifications", with the note "Hosting still works without them, but you won't see its status."
-     - BATTERY: `BatteryStep`.
-     - AGENT_REACHES_ADBD: no action. The text is "Checked once hosting starts."
-  3. **`MiuiInstallHelp`**, only when `oem == Oem.XIAOMI`.
-- **`UsbBootstrapStep`.** It lists these steps:
-  1. Connect USB to a trusted computer.
-  2. Allow USB debugging on the phone.
-  3. On the computer, run `adb tcpip 5555`.
-  4. Keep the cable connected until Setu confirms.
-
-  Below the steps, show "Don't unplug yet: waiting for the phone to report 127.0.0.1:5555." when `!canUnplugUsb`, and "Setup confirmed. You can unplug the USB cable." when it is true. Add a one-line caution: "Use only trusted networks. Don't forward port 5555."
-- **`BatteryStep`.** It shows the battery state. It lists one button per destination, labelled by purpose ("Autostart settings", "Battery settings", "App info") and suffixed with "(phone maker)" when `vendorSpecific`. It adds the note "Some phone makers add extra switches we can't check. Turn off restrictions for Setu if you see them." There is no confirm checkbox (AD-13).
-- **`MiuiInstallHelp`** is an expandable card titled "Install failed on a Xiaomi phone?". The body says that if installing shows `INSTALL_FAILED_USER_RESTRICTED`, the user should turn on **Install via USB** and **USB debugging (Security settings)** in Developer options where IT allows it. It has an action to open developer options.
-
-**Copy rule.** No string in `feature/setup` may contain "approve", "approved" or "approval": P01's `MainActivityTest` forbids it on the first screen.
-
-**`MainActivity.kt`.** Keep the "Setu" title text and put `SetupScreen` under it. Build the VM with:
+**`HostViewModel.kt`.**
 
 ```kotlin
-viewModel { SetupViewModel(AndroidDeviceProbe(applicationContext), usbFallbackAllowed = true, connectionState = MutableStateFlow(ConnectionState.Idle)) }
+interface HostingActions {
+    fun start()
+    fun stop()
+    suspend fun pair(): String
+}
+
+data class HostUiState(
+    val status: HostStatus,
+    val deviceId: String?,
+    val pairingCode: String?,
+    val warning: String?,
+    val canStart: Boolean,
+    val canStop: Boolean,
+    val message: HostMessage?,
+)
+
+enum class HostStatus { IDLE, STARTING, ONLINE, RECONNECTING, BLOCKED, POLICY_MISSING }
+sealed interface HostMessage {
+    data object NoRelay : HostMessage
+    data object PairFailed : HostMessage
+    data class RetryIn(val seconds: Long) : HostMessage
+}
+
+class HostViewModel(
+    connectionState: StateFlow<ConnectionState>,
+    private val actions: HostingActions,
+    private val relayConfigured: Boolean,
+) : ViewModel() {
+    val uiState: StateFlow<HostUiState>
+    fun start()
+    fun stop()
+    fun newCode()
+}
 ```
 
-There are two placeholders, one per later ticket. `usbFallbackAllowed` stays fixed until AT-09 (AD-12). The connection state stays `Idle` until AT-06 (AD-14). Leave a one-line comment on each that names the ticket. Don't add a holder, a singleton or a service change.
+Map the SDK state as follows:
+- `Idle` → IDLE.
+- `Starting` → STARTING.
+- `Online` → ONLINE, with `deviceId`, `pairingCode` and `warning` copied **verbatim** from the state.
+- `Reconnecting` → RECONNECTING, with `message = RetryIn(ceil(retryInMs / 1000))` only when `retryInMs >= 0`. For `-1`, don't set `message`, so no countdown shows.
+- `Blocked` → BLOCKED.
+- `PolicyMissing` → POLICY_MISSING.
+
+Rules for the VM:
+- `canStart = status == IDLE && relayConfigured`.
+- `canStop = status != IDLE`.
+- When `relayConfigured` is false and the status is IDLE, `message = NoRelay`.
+- `start()` and `stop()` call the actions and change no state themselves: the state comes back through `connectionState`.
+- `newCode()` launches `actions.pair()` in `viewModelScope` and **ignores the returned string** (P03: the code shown is always `Online.pairingCode` from the agent). If it throws anything other than `CancellationException`, set a one-shot `message = PairFailed` that clears on the next state emission.
+- Combine `connectionState` with a private `MutableStateFlow<HostMessage?>` for the pair failure. Use `stateIn(viewModelScope, Eagerly, <initial from connectionState.value>)`.
+
+**`HostScreen.kt`.** It has a stateful `HostScreen(viewModel)` and a stateless `HostContent(state, onStart, onStop, onNewCode)`. Content, top to bottom:
+1. **Status line:** "Not hosting", "Starting…", "Hosting", "Reconnecting…", "Blocked by policy" or "Waiting for IT setup".
+2. **When ONLINE,** "Device ID: <id>" and, if `pairingCode != null`, the code in large monospace text with the label "Setu code: read it to the developer". If `warning != null`, show one line: "Hosting warning: <warning>". AT-08 adds recovery.
+3. **The message line:**
+   - NoRelay: "No relay is configured in this build."
+   - PairFailed: "Couldn't get a new code. Try again."
+   - RetryIn: "Retrying in N s".
+4. **Buttons:**
+   - "Start hosting" (enabled only when `canStart`).
+   - "New code" (only when ONLINE and `pairingCode != null`).
+   - "Stop hosting" (shown whenever `canStop`, P17).
+
+The screen has no text field. Copy must pass the P01 rule (no "approve", "sign in", "account" or "email").
+
+**`MainActivity.kt`.**
+- Keep the "Setu" title. Below it, add a `TabRow` with "Prepare" and "Host". Remember the selection with `rememberSaveable`, defaulting to Prepare. Prepare shows `SetupScreen`; Host shows `HostScreen`.
+- Both VMs get `HostingRegistry.connectionState`, which replaces AT-05's `MutableStateFlow(Idle)`. Delete that placeholder comment and keep the AT-09 comment on `usbFallbackAllowed`.
+- `HostingActions` is a small private object in `MainActivity.kt`:
+  - `start()` = `HostingService.start(applicationContext, BuildConfig.SETU_RELAY_URL)`
+  - `stop()` = `HostingService.stop(applicationContext)`
+  - `pair()` = `HostingRegistry.pair()`
+- Set `relayConfigured = BuildConfig.SETU_RELAY_URL.isNotBlank()`.
 
 ## 4. TDD: write these tests first, see them fail, then implement
 
-Map each test to its acceptance ID in a comment. Use JUnit 4, Robolectric `@Config(sdk = [35])` for Compose, and coroutines-test (`runTest`, plus `Dispatchers.setMain` with a test dispatcher) and Turbine for the VM. Use a fake `DeviceProbe` whose snapshot the test can change and that counts reads.
+Map each test to its acceptance ID in a comment. Use JUnit 4, coroutines-test (`Dispatchers.setMain`) and Turbine for VMs, and Robolectric `@Config(sdk = [35])` for Compose and the service. Use a fake `HostingActions` that records calls and scripts `pair()`.
 
-- **`SetupViewModelTest` (P04):**
-  - sdk 35 on Wi-Fi gives the Wireless path, with the five Wireless steps in `Step` order.
-  - sdk 29 gives the USB path, and `canUnplugUsb == false` while the connection is `Idle`.
-  - Emitting `Online(adbdEndpoint = "127.0.0.1:5555")` flips `canUnplugUsb` to true without a recheck.
-  - Emitting `"127.0.0.1:5556"` keeps it false.
-  - Cellular with `usbFallbackAllowed = false` gives `Unsupported` and an empty step map.
-  - `recheck()` re-reads the probe. Change the fake to developer options YES, call `recheck()`, and the step becomes YES.
-  - `init` reads the probe exactly once.
-- **`SetupContentTest` (Robolectric Compose, `createComposeRule`):**
-  - P04: `Unsupported` shows the Contact IT message and no step rows.
-  - P04: the USB path with `canUnplugUsb = false` shows "Don't unplug yet", and with true it shows "You can unplug".
-  - P04 OEM: XIAOMI shows "Install failed on a Xiaomi phone?", and OTHER doesn't.
-  - P04 OEM: with destinations `[vendor BATTERY, APP_DETAILS]`, clicking "Battery settings (phone maker)" calls `open` with that destination.
-  - P06: notifications NO shows "Allow notifications" plus the "Hosting still works" note, and clicking it calls `fixNotifications`.
-  - P05 (phone half, partial): no node has a set-text action (`onAllNodes(hasSetTextAction()).assertCountEquals(0)`) on either path.
-- **`SetupScreenRecheckTest` (P04 recheck on return):**
-  1. Use `createAndroidComposeRule<ComponentActivity>()` and set `SetupScreen(vm)` with the fake probe.
-  2. Move the activity to CREATED and then back to RESUMED via `activityRule.scenario.moveToState(...)`.
-  3. Assert the probe read count increased by at least one more than the initial reads.
-- **The existing `MainActivityTest` (P01) must stay green unchanged.**
+- **`HostingRegistryTest` (app):**
+  - P17: with nothing attached, the state is `Idle`.
+  - After `attach(fake)`, emitting `Online` on the fake shows through.
+  - `detach(fake)` returns the state to `Idle`.
+  - `detach(other)` is a no-op.
+  - `pair()` delegates to the attached fake, and with nothing attached it throws `IllegalStateException`.
+  - Service wiring: building `HostingService` with Robolectric (reuse `HostingServiceTest`'s `TestHostingService` pattern in this test file) attaches the fake, and destroying it detaches it.
+  - Detach in `@After` so tests don't leak global state.
+- **`HostViewModelTest` (`:feature:host`):**
+  - The mapping table for every `ConnectionState` (P03 and P10 hosting part: ONLINE carries the device ID and code verbatim).
+  - `Reconnecting(retryInMs = -1)` gives no message; `Reconnecting(retryInMs = 2500)` gives `RetryIn(3)`.
+  - P03: with `Online(pairingCode = "111111")`, `newCode()` where the fake `pair()` returns `"999999"` still shows `"111111"`. Emitting `Online(pairingCode = "222222")` then shows `"222222"`.
+  - `pair()` throwing sets `PairFailed`, and the next state emission clears it.
+  - `canStart`/`canStop` across IDLE and ONLINE; `relayConfigured = false` gives `canStart == false` and `NoRelay`.
+  - `start()`/`stop()` call the actions exactly once and don't change `uiState` by themselves.
+- **`HostContentTest` (Robolectric Compose):**
+  - P17: "Stop hosting" exists for ONLINE and RECONNECTING and is absent for IDLE.
+  - Clicking it calls `onStop`.
+  - ONLINE with a code shows the code and "New code"; ONLINE without a code hides both.
+  - RECONNECTING with no message shows no "Retrying in".
+  - NoRelay shows its text, and "Start hosting" is disabled.
+  - No node has a set-text action.
+- **The existing `MainActivityTest` (P01) stays green unchanged.** Prepare is the default tab, so it still sees "Setu".
 
 ## 5. Gates (all must pass before you push)
 
@@ -157,22 +172,22 @@ Map each test to its acceptance ID in a comment. Use JUnit 4, Robolectric `@Conf
 ./gradlew :app:assembleDebug
 ```
 
-Use no `@Suppress`, no baselines, and disable no new lint checks (AD-8). The only detekt config change allowed is the AD-9 `FunctionNaming` key. If another detekt rule fires on a composable (for example `LongMethod` or `LongParameterList`), split the composable. Don't change the config. If lint objects to anything you can't fix in code, stop and report the exact error.
+Use no `@Suppress`, no baselines, no detekt config change and no new disabled lint checks (AD-8). If a rule fires, change the code (split composables, move small contract classes as AT-05 did). If lint objects to the `buildConfigField` or anything else you can't fix in code, stop and report the exact error.
 
 ## 6. Architecture and Karpathy pillars (enforced at review)
 
-- **Clean Architecture and SOLID.** UI (`SetupContent`) → ViewModel (`SetupViewModel`, `StateFlow`, UDF) → domain (`detectSetupPath`, `readiness` from `:core:readiness`) → data (`DeviceProbe` over the readers). The VM has no `Context`. Composables hold no rules: everything that decides YES, NO, UNKNOWN or unplug comes from `SetupUiState`.
-1. **Think before coding.** The PR description opens with `## Assumptions & Trade-offs`. If J2, P04, SCREENS A02 to A05, this prompt and the platform disagree, stop and ask.
-2. **Simplicity first.** Write the minimum code: no navigation library, no DI, no persistence, no Start hosting button (AT-06), no pairing guide screen (AT-08), no animations, no theming work beyond `MaterialTheme`. Keep files under ~250–300 lines and composables short.
-3. **Surgical changes.** Touch only the files in §2. Branch from latest `main` as `feature/AT-05-guided-setup-ui`. Make atomic conventional commits (`test(android): …` red first, then `feat(android): …`).
+- **Clean Architecture and SOLID.** UI (`HostContent`) → ViewModel (`HostViewModel`, `StateFlow`, UDF) → `HostingActions` and `StateFlow<ConnectionState>` (ports) → `:app` adapters (`HostingRegistry`, `HostingService`) → SDK. `:feature:host` doesn't depend on `SetuHost` or `:app`. Only `HostingService` starts or stops the SDK (AD-1).
+1. **Think before coding.** The PR description opens with `## Assumptions & Trade-offs`. If A06, P03, P17, `API_SPEC.md` and this prompt disagree, stop and ask.
+2. **Simplicity first.** Write the minimum code: no navigation library, no DI, no persistence, no sessions list, no countdown timer (the retry seconds come from the state as emitted, with no ticking), no recovery UI. Keep files under ~250–300 lines.
+3. **Surgical changes.** Touch only the files in §2. `HostingService` gets exactly the attach and detach lines. Branch from latest `main` as `feature/AT-06-solo-hosting-screen`. Make atomic conventional commits (`test(android): …` red first, then `feat(android): …`). Commit only code for this ticket: no design docs or prototype files on this branch.
 4. **Goal-driven TDD.** Commit the failing tests first, then the implementation. Paste the exact gate output in the PR.
 
 ## 7. PR and hard stop
 
-Open one PR against `main` titled `feat(android): AT-05 guided setup UI`, with this body:
+Open one PR against `main` titled `feat(android): AT-06 solo hosting screen`, with this body:
 
 ```
-Ticket: AT-05 (docs/TDD_TICKETS.md §6) · Acceptance: P04 (guided setup end to end with fakes), P05 phone half (partial), P06 (notification denial copy)
+Ticket: AT-06 (docs/TDD_TICKETS.md §6) · Acceptance: P03, P17, P10 (hosting part)
 
 ## Assumptions & Trade-offs
 - …
@@ -185,7 +200,7 @@ Ticket: AT-05 (docs/TDD_TICKETS.md §6) · Acceptance: P04 (guided setup end to 
 <full green output of ./gradlew testDebugUnitTest detekt lint and :app:assembleDebug>
 
 ## Out of scope (left for later tickets)
-- live ConnectionState and Start hosting (AT-06), system pairing guide (AT-08), EMM usbFallbackAllowed (AT-09), persisted settings (AT-10)
+- sessions list and End (AT-07), adbd recovery and pairing guide (AT-08), managed/blocked screens and EMM relay (AT-09), relay URL setting and notification-denial fallback (AT-10)
 ```
 
-Then **stop immediately**. Don't start AT-06, don't edit `docs/`, and don't merge.
+Then **stop immediately**. Don't start AT-07, don't edit `docs/`, and don't merge.
