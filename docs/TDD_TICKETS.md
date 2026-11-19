@@ -10,7 +10,7 @@ Companion to the first architecture and UX audit against v1.0.1.
 
 Updated by the post-merge ritual. Desktop (DT-*) status is tracked in Setu-Desktop's copy of this file.
 
-- [ ] AT-01 · Project scaffold and SDK test seam
+- [x] AT-01 · Project scaffold and SDK test seam · Done in [#4](https://github.com/SumukhaK/Setu-mobile/pull/4)
 - [ ] AT-02 · Hosting foreground service and notification
 - [ ] AT-03 · Readiness engine
 - [ ] AT-04 · Battery and OEM readiness, MIUI install recovery

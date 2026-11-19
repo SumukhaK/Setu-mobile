@@ -10,6 +10,17 @@ Open `index.html` in a browser. The scenario selector in the desktop review pane
 
 The wireframe uses fixtures. The canonical journeys distinguish Android and SDK capabilities from planned integration, including the separate Android system pairing step.
 
+## Build the app
+
+The Android app lives in `:app` and `:core:setu` and uses the vendored Setu SDK 1.1.0 in `third_party/setu-android/`. You need JDK 17 and the Android SDK (API 35).
+
+```sh
+./gradlew testDebugUnitTest detekt lint   # unit tests and static analysis
+./gradlew :app:assembleDebug              # debug APK
+```
+
+Work is tracked ticket by ticket in [docs/TDD_TICKETS.md](docs/TDD_TICKETS.md). Builders start from [docs/prompts/CURRENT_TASK.md](docs/prompts/CURRENT_TASK.md).
+
 <details>
 <summary>Historical walkthrough from before the SDK audit</summary>
 

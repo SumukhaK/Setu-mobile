@@ -1,81 +1,84 @@
-# Builder prompt · AT-01 · Project scaffold and SDK test seam
+# Builder prompt · AT-02 · Hosting foreground service and notification
 
 You are the builder for one ticket in `SumukhaK/Setu-mobile`. Do this ticket only, open one PR, then stop.
 
 ## 0. Read first (in this order, nothing else)
 
-1. `docs/CODEBASE_MEMORY.md` (repo map, architecture decisions AD-1 to AD-8).
-2. `docs/TDD_TICKETS.md` §4 (stack, Android test seam) and §6 "AT-01".
-3. Setu-Desktop `docs/JOURNEYS.md` row P01: https://github.com/SumukhaK/Setu-Desktop/blob/main/docs/JOURNEYS.md
-4. Setu-SDK v1.1.0 `API_SPEC.md` §4.1–§4.3: https://github.com/SumukhaK/Setu/blob/v1.1.0/API_SPEC.md
-5. The SDK's SPI and its own fake, as the reference for the agent line format: `android/agent-protocol/src/main/kotlin/dev/genadb/sdk/Spi.kt` and `FakeAgent` in `android/agent-protocol/src/test/kotlin/dev/genadb/sdk/SdkTest.kt` (tag `v1.1.0`).
+1. `docs/CODEBASE_MEMORY.md` (repo map, interfaces, AD-1 to AD-10).
+2. `docs/TDD_TICKETS.md` §2.6 (notification decision) and §6 "AT-02".
+3. Setu-Desktop `docs/JOURNEYS.md` rows P06 and P17: https://github.com/SumukhaK/Setu-Desktop/blob/main/docs/JOURNEYS.md
+4. Setu-SDK v1.1.0 `API_SPEC.md` §4.1 (`SetuManager`) and §4.4 (notifications): https://github.com/SumukhaK/Setu/blob/v1.1.0/API_SPEC.md
+5. Existing code you will extend: `core/setu/src/main/.../SetuHost.kt`, `SetuManagerHost.kt`, `core/setu/src/test/.../SetuManagerHostTest.kt`, `app/src/main/AndroidManifest.xml`, `app/build.gradle.kts`.
 
-Do not scan the rest of the repo. `index.html` is a wireframe prototype: do not touch it.
+The SDK's sample `AgentService` uses `VISIBILITY_PRIVATE` and posts `text`. **Do not copy it.** This ticket uses the stricter rule in AD-2.
 
 ## 1. Goal
 
-A buildable Android project with two modules, `:app` and `:core:setu`. It depends on the Setu Android SDK 1.1.0 and puts `SetuManager` behind our own `SetuHost` interface. It also has a test seam that runs the real SDK reducers against scripted agent output. No features, no hosting service, no readiness, no navigation.
+Add a foreground service that owns the Setu agent's lifecycle and a lock-screen-safe notification. It is the only place that calls `SetuManager.initialize`, `start`, `stop` and `refreshPolicy`. It reacts to EMM restriction changes and keeps the notification in sync with `connectionState` and `sessions`. There is no UI work: AT-05 and AT-06 will call the service's start and stop helpers.
 
-## 2. Files (create only these)
+## 2. Files (create or change only these)
 
 ```
-settings.gradle.kts                    rootProject "setu-mobile"; include(":app", ":core:setu")
-build.gradle.kts                       plugins apply false; detekt applied to all modules
-gradle.properties                      android.useAndroidX=true, kotlin.code.style=official, jvmargs
-gradle/libs.versions.toml              all versions and libraries (see §3)
-gradle/wrapper/*  gradlew  gradlew.bat  Gradle wrapper 8.11.1+
-config/detekt/detekt.yml               detekt defaults (generate with detektGenerateConfig, do not hand-tune)
-third_party/setu-android/setu-android-1.1.0.aar   vendored SDK (AD-5)
-third_party/setu-android/README.md     source tag, commit, sha256, how it was built
-app/build.gradle.kts                   application, Compose, packaging { jniLibs { useLegacyPackaging = true } }
-app/src/main/AndroidManifest.xml
-app/src/main/kotlin/dev/setu/mobile/MainActivity.kt      one Compose screen showing "Setu" and nothing else
-app/src/test/kotlin/dev/setu/mobile/MainActivityTest.kt   Robolectric P01 UI check
-core/setu/build.gradle.kts             android library; api(SDK AAR) + api(coroutines-android)
-core/setu/src/main/kotlin/dev/setu/mobile/core/setu/SetuHost.kt          interface
-core/setu/src/main/kotlin/dev/setu/mobile/core/setu/SetuManagerHost.kt   implementation wrapping SetuManager
-core/setu/src/test/kotlin/dev/setu/mobile/core/setu/FakeAgentLauncher.kt
-core/setu/src/test/kotlin/dev/setu/mobile/core/setu/FakePolicyProvider.kt
-core/setu/src/test/kotlin/dev/setu/mobile/core/setu/SetuManagerHostTest.kt
-.gitignore                             Android/Gradle ignores (create if absent)
+core/setu/src/main/.../SetuHost.kt                  add sessions, refreshPolicy, nullable start (see §3)
+core/setu/src/main/.../SetuManagerHost.kt           delegate the new members
+core/setu/src/test/.../SetuManagerHostTest.kt       add one wiring test for sessions (see §4)
+app/src/main/AndroidManifest.xml                    service, FGS permissions, special-use property
+app/src/main/kotlin/dev/setu/mobile/service/HostingService.kt
+app/src/main/kotlin/dev/setu/mobile/service/HostingNotification.kt
+app/src/main/res/values/strings.xml                 channel name, FGS subtype text (create if absent)
+app/src/test/kotlin/dev/setu/mobile/service/FakeSetuHost.kt
+app/src/test/kotlin/dev/setu/mobile/service/HostingNotificationTest.kt
+app/src/test/kotlin/dev/setu/mobile/service/HostingServiceTest.kt
+app/build.gradle.kts + gradle/libs.versions.toml    only if you add androidx-core-ktx (see §3); also remove the unused debugImplementation(ui-test-manifest)
 ```
 
 ## 3. Contract to implement (decided by the architect; do not reinterpret)
 
-**Toolchain (match the SDK build).** AGP 8.9.3, Kotlin 2.1.21 with the Compose compiler plugin, JDK/JVM target 17, compileSdk 35, targetSdk 35, minSdk 29. Use the Compose BOM, `kotlinx-coroutines-android` 1.10.2, JUnit 4, `kotlinx-coroutines-test`, Turbine, Robolectric, `androidx.test:core`, and detekt 1.23.8. Android lint is on with `warningsAsErrors = true` and `abortOnError = true`. Put every version in `libs.versions.toml`.
-
-**SDK dependency (AD-5).** The SDK is not on any Maven repo. Vendor the official 1.1.0 AAR at `third_party/setu-android/setu-android-1.1.0.aar` and depend on it from `:core:setu` with `api(files(...))`. A file AAR carries no POM, so also declare `api(libs.kotlinx.coroutines.android)` (1.10.2, as the SDK declares). Build the AAR from `SumukhaK/Setu` tag `v1.1.0` with `cd android && ./gradlew :genadb-android:assembleRelease` (needs Go 1.24+), or take it from the v1.1.0 GitHub release if one is attached. Record the tag, commit `921aded` and the sha256 in the README. If you can't get the AAR, stop and ask. Don't stub the SDK.
-
-**Ids (AD-6).** applicationId and namespace `dev.setu.mobile`; `:core:setu` namespace `dev.setu.mobile.core.setu`.
-
-**`SetuHost` (AD-7).** This is the only seam the rest of the app will use. It exposes SDK model types directly (`ConnectionState`, `PolicyStatus`, `SetuConfig`). Don't add mapper or domain model copies until a feature needs them.
+**`SetuHost` changes (AD-7).** These mirror the SDK's own signatures:
 
 ```kotlin
 interface SetuHost {
     val connectionState: StateFlow<ConnectionState>
     val policyStatus: StateFlow<PolicyStatus>
-    fun start(config: SetuConfig)
+    val sessions: StateFlow<List<DeviceSession>>
+    fun start(config: SetuConfig? = null)   // null reuses the last config (SDK behaviour)
     fun stop()
+    fun refreshPolicy(): PolicyStatus
 }
 ```
 
-`SetuManagerHost(private val manager: SetuManager) : SetuHost` only delegates. No logic, no logging. Nothing else in `:core:setu` main.
+`SetuManagerHost` still only delegates. Existing AT-01 tests must stay green without edits, apart from the one added test.
 
-**Fakes (test source set only).**
-- `FakeAgentLauncher : AgentLauncher` records launch args. Each `launch` returns a `FakeAgentProcess` with `emit(json: String)` and `exit(code: Int)`. `readLine` blocks on a queue and returns null after `exit` or `destroy`, and `destroy` must unblock it. Mirror the SDK's own `FakeAgent`: same behaviour, our package.
-- `FakePolicyProvider(var policy: ManagedPolicy = ManagedPolicy()) : PolicyProvider`.
-- Build the real manager in tests as `SetuManager.Builder(ApplicationProvider.getApplicationContext()).agentLauncher(fake).policyProvider(fakePolicy).networkInfoProvider { emptyList() }.stateDir(tempDir).scope(testScope).build()`. Never mock `SetuManager` (internal constructor, see TDD_TICKETS §4). The SDK reads agent lines on a blocking thread, so use a real-dispatcher scope that you cancel in `@After`, and await flows with Turbine or `withTimeout`. Don't add sleeps.
+**`HostingNotification` (P06, AD-2).** It has no state and no SDK calls of its own.
+- `fun build(context: Context, content: NotificationContent): Notification`, using the platform `Notification.Builder` (minSdk 29 needs no compat).
+- Title is `content.title`. Content text is `content.publicText` in **both** the main notification and the `setPublicVersion(...)` copy. `content.text` is never read.
+- Use `setVisibility(Notification.VISIBILITY_SECRET)`, `setOngoing(true)` and `setOnlyAlertOnce(true)`, on channel id `"hosting"`. Use a platform small icon (`android.R.drawable.stat_sys_data_bluetooth`) for now.
+- `fun ensureChannel(context: Context)` creates channel `"hosting"` with `IMPORTANCE_LOW` and the name from `strings.xml`.
+- Notification id is the constant `NOTIFICATION_ID = 1`.
 
-**What not to call.** Don't call `SetuManager.initialize` or `getInstance`, and don't add a `Service`, permissions, a notification channel, a DI framework, navigation or a theme beyond `MaterialTheme`. AD-1 reserves `initialize`, `start`, `stop` and `refreshPolicy` for `HostingService` (AT-02); here only tests call `start`.
+**`HostingService` (AD-1).** It is an `open class HostingService : Service()` that is not exported and declares `android:foregroundServiceType="specialUse"`. Add a `<property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="@string/fgs_subtype"/>` that explains the use, for example "Hosts an encrypted remote ADB debugging session for a paired desktop". Add the `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE` and `POST_NOTIFICATIONS` permissions. The SDK's network permissions already merge in from the AAR, so don't add them.
+- Companion helpers: `fun start(context: Context, relayUrl: String)` calls `startForegroundService` with extra `EXTRA_RELAY_URL`. `fun stop(context: Context)` calls `stopService`.
+- `protected open fun createHost(): SetuHost = SetuManagerHost(SetuManager.initialize(SetuManager.Builder(this)))`. This is the only `initialize` call in the app. Tests subclass the service and override it. Don't use a global or static test hook.
+- `onCreate`: create the host and the channel. Register a receiver for `Intent.ACTION_APPLICATION_RESTRICTIONS_CHANGED` with `ContextCompat.registerReceiver(..., ContextCompat.RECEIVER_NOT_EXPORTED)`, and add `androidx-core-ktx` to the catalog if it isn't declared. On receive, call `host.refreshPolicy()` then `host.start()`. Then collect `combine(host.connectionState, host.sessions, SetuNotifications::content)` on a `MainScope()` and post each result through `NotificationManager.notify(NOTIFICATION_ID, HostingNotification.build(...))`.
+- `onStartCommand`: first call `startForeground(NOTIFICATION_ID, HostingNotification.build(this, SetuNotifications.content(host.connectionState.value, host.sessions.value)), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)`. Then call `host.start(SetuConfig(relayUrl = it))` if the intent carries a relay URL, otherwise `host.start()`. Return `START_NOT_STICKY` (no persistence; settings storage arrives in AT-10).
+- If `host.start` throws `GenAdbException.NotConfigured`, call `stopSelf()` and don't crash. Catch only that exception. Don't wrap anything else in `runCatching`.
+- `onDestroy`: call `host.stop()`, unregister the receiver, cancel the scope, and `stopForeground(STOP_FOREGROUND_REMOVE)`.
+- Never log anything, and never put `content.text` or a pairing code into an intent, a log or a notification.
 
 ## 4. TDD: write these tests first, see them fail, then implement
 
-Map each test to its acceptance ID in a comment.
+Map each test to its acceptance ID in a comment. Use Robolectric with `@Config(sdk = [35])` unless noted.
 
-- **P01, domain:** with `FakePolicyProvider()` (no managed config), `host.policyStatus.value` is `mode == Mode.SOLO`, `managed == false`, `missing == null`, and `connectionState` starts as `Idle`. Nothing is launched before `start`.
-- **Smoke, from the ticket:** after `host.start(SetuConfig(relayUrl = "wss://relay.test/"))`, the fake sees one launch. Then `emit("""{"event":"online","device_id":"dev-1"}""")` and `emit("""{"event":"pairing_code","code":"4321-908172","device_id":"dev-1"}""")`, and `connectionState` reaches `Online(deviceId = "dev-1", pairingCode = "4321-908172", …)`.
-- **Stop:** `host.stop()` destroys the fake process, and `connectionState` returns to `Idle`. Take the expected terminal state from the SDK's behaviour; if it differs, write down what you saw in Assumptions.
-- **P01, UI (Robolectric, `:app`):** `MainActivity` launches. The screen shows "Setu" and has no node whose text contains "Sign in", "Account", "Approve" or "Email" (case-insensitive).
+- **P06, notification:** given `SetuNotifications.content(ConnectionState.Online(deviceId = "dev-1", pairingCode = "4321-908172"), emptyList())`, the built notification has `visibility == VISIBILITY_SECRET`, its `EXTRA_TEXT` equals `content.publicText`, and its `publicVersion` text equals `content.publicText`. Gather every `CharSequence` in `extras` for both versions, plus `tickerText`. None of them contains `"4321-908172"` or `"4321908172"`. Add a table over `Idle`, `Starting`, `Reconnecting`, `Blocked` and `PolicyMissing` checking the same rule: text is always `publicText`.
+- **P06, permission denied (`@Config(sdk = [33])`):** with `POST_NOTIFICATIONS` denied through the shadow app, starting the service still calls `host.start(...)` once and doesn't throw.
+- **Start:** `onStartCommand` with `EXTRA_RELAY_URL = "wss://relay.test/"` puts the service in the foreground with the notification id and calls `FakeSetuHost.start` once with that URL. Without the extra, it calls `start(null)`.
+- **Notification follows state:** after `FakeSetuHost` moves `connectionState` to `Online(...)` and `sessions` to one session, the posted notification text equals `SetuNotifications.content(state, sessions).publicText`. Idle the main looper; don't sleep.
+- **Restrictions changed:** broadcasting `ACTION_APPLICATION_RESTRICTIONS_CHANGED` calls `refreshPolicy()` then `start(null)`, in that order.
+- **NotConfigured:** when `FakeSetuHost.start` throws `GenAdbException.NotConfigured()`, the service stops itself and nothing throws.
+- **P17, stop hosting:** destroying the service calls `host.stop()` once, removes the foreground notification, and unregisters the receiver, so a later broadcast doesn't call `refreshPolicy`.
+- **`:core:setu` wiring:** using the existing real-SDK seam, after `session_open` (`{"event":"session_open","session_id":"a1","peer_label":"ci-laptop","transport":"relay-wss","kind":"adb"}`), `host.sessions` holds one session with id `a1`. After `host.stop()`, it's empty.
+
+`FakeSetuHost` is a plain class with `MutableStateFlow`s and call recorders. It has no mocking library and no logic beyond recording (AD-10).
 
 ## 5. Gates (all must pass before you push)
 
@@ -84,38 +87,35 @@ Map each test to its acceptance ID in a comment.
 ./gradlew :app:assembleDebug
 ```
 
-No `@Suppress`, no detekt baseline, no lint baseline. If a gate fails for a reason outside this ticket, such as detekt 1.23.8 refusing Kotlin 2.1.21, stop and report the exact error instead of downgrading or disabling anything.
+Use no `@Suppress`, no baselines, and disable no new lint checks (AD-8). If a gate fails for a reason outside this ticket, stop and report the exact error.
 
 ## 6. Architecture and Karpathy pillars (enforced at review)
 
-- **Clean Architecture and SOLID.** Dependencies point one way: `ui` → `domain/usecase` → `data/repository` (`SetuHost`) → SDK. In AT-01 only the bottom layer exists. Don't create empty `domain` or `ui` packages, use cases or ViewModels. `SetuHost` is a narrow interface (ISP), and the app will depend on it rather than on `SetuManager` (DIP). State is exposed only as `StateFlow` (UDF).
-1. **Think before coding.** The PR description opens with `## Assumptions & Trade-offs`. If the ticket, this prompt and `API_SPEC.md` disagree, stop and ask before coding around it.
-2. **Simplicity first.** Write the minimum code for this ticket: no speculative modules (`:core:readiness` arrives in AT-03, `:feature:*` later), no base classes, no wrappers beyond `SetuHost`. Keep files under ~250–300 lines.
-3. **Surgical changes.** Touch only the files in §2. Don't edit `docs/`, `README.md` or `index.html`. Branch from latest `main` as `feature/AT-01-scaffold-sdk-seam`. Make atomic conventional commits, for example `build(android): add Gradle scaffold and vendored Setu SDK 1.1.0`, `test(android): add SetuHost seam tests with fake agent`, `feat(android): add SetuHost backed by SetuManager`.
+- **Clean Architecture and SOLID.** The service depends on `SetuHost`, never on `SetuManager`, except in the one `createHost()` line (DIP). `HostingNotification` only builds, and `HostingService` only does lifecycle and wiring (SRP). Don't add ViewModels, use cases, DI frameworks, Application subclasses or a repository layer: no ticket needs them yet.
+1. **Think before coding.** The PR description opens with `## Assumptions & Trade-offs`. If the ticket, this prompt, JOURNEYS and `API_SPEC.md` disagree, stop and ask.
+2. **Simplicity first.** Write the minimum code: no wake locks, no boot receiver, no notification actions or "Stop" button (AT-06), no session list, no retries. Keep files under ~250–300 lines.
+3. **Surgical changes.** Touch only the files in §2. Don't edit `docs/`, `README.md` or the prototype. Branch from latest `main` as `feature/AT-02-hosting-service`. Make atomic conventional commits, for example `test(android): add hosting service and notification tests`, `feat(android): extend SetuHost with sessions and refreshPolicy`, `feat(android): add hosting foreground service with lock-screen-safe notification`.
 4. **Goal-driven TDD.** Commit the failing tests first (red), then the implementation (green). Paste the exact gate output in the PR.
 
 ## 7. PR and hard stop
 
-Open one PR against `main` titled `feat(android): AT-01 project scaffold and SDK test seam`, with this body:
+Open one PR against `main` titled `feat(android): AT-02 hosting foreground service and notification`, with this body:
 
 ```
-Ticket: AT-01 (docs/TDD_TICKETS.md §6) · Acceptance: P01 + fake-agent smoke test
+Ticket: AT-02 (docs/TDD_TICKETS.md §6) · Acceptance: P06 (clarified), P17 (stop hosting)
 
 ## Assumptions & Trade-offs
 - …
 
 ## What changed
-- one line per file or file group
-
-## SDK artifact
-- source tag/commit, sha256 of third_party/setu-android/setu-android-1.1.0.aar
+- one line per file
 
 ## Test evidence
 <red run excerpt showing the new tests failing>
 <full green output of ./gradlew testDebugUnitTest detekt lint and :app:assembleDebug>
 
 ## Out of scope (left for later tickets)
-- HostingService and notification (AT-02), readiness (AT-03/04), setup UI (AT-05), hosting screen (AT-06)
+- readiness (AT-03/04), setup UI and the in-app Stop control (AT-05/AT-06), sessions list and End (AT-07), settings storage for the relay URL (AT-10)
 ```
 
-Then **stop immediately**. Don't start AT-02, don't edit `docs/`, and don't merge.
+Then **stop immediately**. Don't start AT-03, don't edit `docs/`, and don't merge.
