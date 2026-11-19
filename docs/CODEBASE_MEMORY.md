@@ -2,7 +2,7 @@
 
 Read this first. It replaces a repo scan. Keep it under 150 lines; update it in every post-merge ritual.
 
-Last updated: 2026-11-19 · main @ `fab5dcf` (AT-01 merged, AT-02 prompt issued) · SDK baseline: Setu-SDK v1.1.0 (`SumukhaK/Setu` tag `v1.1.0`, commit `921aded`)
+Last updated: 2026-11-19 · main @ `c3e0674` (AT-02 merged, AT-03 prompt issued) · SDK baseline: Setu-SDK v1.1.0 (`SumukhaK/Setu` tag `v1.1.0`, commit `921aded`)
 
 ## Pipeline
 
@@ -27,6 +27,10 @@ config/detekt/detekt.yml        generated defaults
 third_party/setu-android/       vendored setu-android-1.1.0.aar + README (sha256 c5d3b368…cf94c)
 app/                            :app, namespace dev.setu.mobile
   src/main/kotlin/dev/setu/mobile/MainActivity.kt   placeholder Compose screen ("Setu")
+  src/main/kotlin/dev/setu/mobile/service/HostingService.kt       FGS (specialUse), owns SDK lifecycle
+  src/main/kotlin/dev/setu/mobile/service/HostingNotification.kt  publicText-only, VISIBILITY_SECRET
+  src/main/res/values/strings.xml                                 channel name, FGS subtype
+  src/test/.../service/FakeSetuHost.kt, HostingServiceTest.kt, HostingNotificationTest.kt
   src/main/res/xml/             backup_rules, data_extraction_rules (exclude everything)
   src/test/.../MainActivityTest.kt                  P01 UI (Robolectric)
 core/setu/                      :core:setu, namespace dev.setu.mobile.core.setu
@@ -38,7 +42,10 @@ docs/                           SCREENS, TDD_TICKETS (AT tracker), CODEBASE_MEMO
 
 ## Key public interfaces
 
-- `dev.setu.mobile.core.setu.SetuHost`: `connectionState: StateFlow<ConnectionState>`, `policyStatus: StateFlow<PolicyStatus>`, `start(config: SetuConfig)`, `stop()`. AT-02 extends it with `sessions`, `refreshPolicy()` and `start(config: SetuConfig? = null)`.
+- `dev.setu.mobile.core.setu.SetuHost`: `connectionState: StateFlow<ConnectionState>`, `policyStatus: StateFlow<PolicyStatus>`, `sessions: StateFlow<List<DeviceSession>>`, `start(config: SetuConfig? = null)` (null reuses the last config), `stop()`, `refreshPolicy(): PolicyStatus`.
+- `dev.setu.mobile.service.HostingService` (open): `HostingService.start(context, relayUrl)`, `HostingService.stop(context)`, `EXTRA_RELAY_URL`. `protected open fun createHost(): SetuHost` is the only `SetuManager.initialize` call. Restrictions broadcast → `refreshPolicy()` + `start(null)`. `NotConfigured` → `stopSelf()`. `START_NOT_STICKY`.
+- `HostingNotification.build(context, NotificationContent)`, `ensureChannel(context)`, `NOTIFICATION_ID = 1`, `CHANNEL_ID = "hosting"`.
+- App test double: `FakeSetuHost` (MutableStateFlows, `calls`, `starts`, `stopCount`, `startError`). Service tests subclass `HostingService` and override `createHost()`.
 - `SetuManagerHost(manager: SetuManager) : SetuHost`: delegation only.
 - Test seam (core/setu test source set): `FakeAgentLauncher` (`awaitLaunch()`, `launches`, `launchCount`), `FakeAgentProcess` (`emit(json)`, `exit(code)`, `destroyed`), `FakePolicyProvider(policy)`. Real manager: `SetuManager.Builder(ctx).agentLauncher().policyProvider().networkInfoProvider { emptyList() }.stateDir(tmp).scope(realScope).build()`.
 
@@ -48,6 +55,9 @@ docs/                           SCREENS, TDD_TICKETS (AT tracker), CODEBASE_MEMO
 | --- | --- | --- |
 | `SetuManager.Builder(...)` injection points | `SetuManagerHostTest` | AT-01 |
 | `connectionState`, `policyStatus`, `start(config)`, `stop()` | `SetuManagerHost` | AT-01 |
+| `sessions`, `refreshPolicy()`, `start(null)` | `SetuManagerHost`, `HostingService` | AT-02 |
+| `SetuManager.initialize`, `SetuNotifications.content(...).publicText` | `HostingService`, `HostingNotification` | AT-02 |
+| `ACTION_APPLICATION_RESTRICTIONS_CHANGED` | `HostingService` receiver | AT-02 |
 
 The SDK's permissions (INTERNET, network/wifi state, multicast) come in through the AAR manifest merge.
 
@@ -63,18 +73,21 @@ The SDK's permissions (INTERNET, network/wifi state, multicast) come in through 
 - AD-8: Toolchain matches the SDK. No detekt or lint baselines and no `@Suppress`. Lint's version-currency checks `GradleDependency`, `AndroidGradlePluginVersion` and `OldTargetApi` are disabled per module, because the pinned toolchain would otherwise fail every build (ratified in the AT-01 review). No other lint check may be disabled.
 - AD-9: Composables are written inline or as named `@Composable` functions with detekt's `FunctionNaming` configured for Compose (`ignoreAnnotated: ['Composable']`) once the first named composable is needed. AT-01 used inline content only.
 - AD-10 (AT-02): App tests that need SDK state use a `FakeSetuHost` (MutableStateFlows) in `app/src/test`. Only `:core:setu` tests run the real SDK with the fake agent.
+- AD-11 (AT-02): `startForeground(..., ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST)`, not `..._SPECIAL_USE` (API 34 constant trips lint at minSdk 29). The manifest declares `specialUse`, so behaviour is identical.
+- AD-12 (AT-03): No SDK or policy field controls the USB fallback. Readiness takes `usbFallbackAllowed: Boolean` as an input (default true). AT-09 supplies it from an app EMM restriction (`allow_usb_fallback`, default true).
 
 ## Completed tickets
 
 | Ticket | PR | Summary |
 | --- | --- | --- |
 | AT-01 | [#4](https://github.com/SumukhaK/Setu-mobile/pull/4) | Gradle scaffold, vendored SDK 1.1.0, `SetuHost` seam, fake agent, P01 domain + UI tests |
+| AT-02 | [#6](https://github.com/SumukhaK/Setu-mobile/pull/6) | HostingService + lock-screen-safe notification, EMM receiver, P06/P17 tests (14 tests total) |
 
 ## Open items
 
-- Active ticket: AT-02 · Hosting foreground service and notification (prompt issued 2026-11-19).
-- Relay URL for solo: AT-02 takes it as a service start extra with no persistence. Settings storage arrives in AT-10. Managed `relay_url` takes precedence (SDK).
-- `debugImplementation(ui-test-manifest)` in `:app` is unused by `createAndroidComposeRule<MainActivity>`. Remove it when a ticket next touches `app/build.gradle.kts`.
-- Merged branch `feature/AT-01-scaffold-sdk-seam` couldn't be deleted from Claude's session. Delete it on GitHub, or turn on "Automatically delete head branches".
+- Active ticket: AT-03 · Readiness engine (prompt issued 2026-11-19).
+- Relay URL for solo: a service start extra with no persistence (AT-02). Settings storage arrives in AT-10. Managed `relay_url` takes precedence (SDK).
+- Merged branches `feature/AT-01-scaffold-sdk-seam` and `feature/AT-02-hosting-service` couldn't be deleted from Claude's session. Delete it on GitHub, or turn on "Automatically delete head branches".
 - SDK v1.1.1 asks: TDD_TICKETS.md §7 (peer_user/peer_fingerprint, solo trustedDesktops/revokeDesktop).
 - Device lab gate (§7) before default-on Android 11+ pairing.
+- `HostingNotificationTest` uses deprecated `Bundle.get` (compile warning only). Replace when that file is next touched.
