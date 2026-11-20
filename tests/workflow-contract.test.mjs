@@ -22,16 +22,22 @@ test("the privileged workflow is default-branch workflow_run only and never cons
   assert.doesNotMatch(workflow, /pull_request:\s*\n/);
   assert.match(workflow, /ref:\s*\$\{\{\s*github\.event\.repository\.default_branch\s*\}\}/);
   assert.match(workflow, /workflow-run\.mjs/);
-  assert.match(workflow, /actions:\s*read/);
-  assert.match(workflow, /pull-requests:\s*write/);
-  assert.doesNotMatch(workflow, /issues:\s*write/);
+  assert.match(workflow, /permissions:\r?\n  actions: read\r?\n  contents: read\r?\n  issues: write\r?\n\r?\n/);
+  assert.doesNotMatch(workflow, /pull-requests:/);
 });
 
 test("the state workflow reads config and metadata through API without running PR content", async () => {
   const script = await readFile(new URL("../scripts/gitkeeper/workflow-run.mjs", import.meta.url), "utf8");
   assert.match(script, /\.github\/gitkeeper\.json/);
   assert.match(script, /api\.github\.com/);
-  assert.match(script, /\/pulls\/\$\{pullRequest\.number\}\/files/);
+  assert.match(script, /run\.actor\?\.login !== "SumukhaK"/);
+  assert.match(script, /\/issues\/\$\{candidate\.number\}/);
+  assert.doesNotMatch(script, /\/repos\/\$\{owner\}\/\$\{repo\}\/pulls\//);
+  assert.ok(
+    script.indexOf('if (run.actor?.login !== "SumukhaK")')
+      < script.indexOf("await writeLabels"),
+    "workflow-run actor is checked before label writes",
+  );
   assert.doesNotMatch(script, /execSync|spawnSync|child_process/);
   assert.doesNotMatch(script, /actions\/download-artifact|artifact/i);
 });

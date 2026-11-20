@@ -1,16 +1,18 @@
-const ROOT_KEYS = ["schemaVersion", "worker", "retry", "polling", "motionPreferences"];
-const WORKER_KEYS = ["enabled", "modelId"];
-const RETRY_KEYS = ["maxAutomaticInvocations"];
-const POLLING_KEYS = ["strategy"];
-const MOTION_KEYS = ["allowed"];
-const MOTION_PREFERENCES = new Set(["system", "reduced", "full"]);
+const ROOT_KEYS = [
+  "worker_enabled",
+  "polling_preferences",
+  "motion_preference",
+  "deterministic_check_ids",
+];
+const POLLING_KEYS = ["mode"];
+const ALLOWED_MOTION_PREFERENCES = new Set(["reduced", "disabled"]);
+export const DETERMINISTIC_CHECK_IDS = Object.freeze(["Android CI"]);
 
 export const DEFAULT_CONFIG = Object.freeze({
-  schemaVersion: 1,
-  worker: Object.freeze({ enabled: false, modelId: null }),
-  retry: Object.freeze({ maxAutomaticInvocations: 3 }),
-  polling: Object.freeze({ strategy: "adaptive" }),
-  motionPreferences: Object.freeze({ allowed: Object.freeze(["system", "reduced", "full"]) }),
+  worker_enabled: false,
+  polling_preferences: Object.freeze({ mode: "adaptive" }),
+  motion_preference: null,
+  deterministic_check_ids: DETERMINISTIC_CHECK_IDS,
 });
 
 function isRecord(value) {
@@ -34,36 +36,26 @@ function assertKeys(value, allowed, location) {
 
 export function validateConfig(value) {
   assertKeys(value, ROOT_KEYS, "config");
-  if (value.schemaVersion !== 1) {
-    throw new TypeError("config.schemaVersion must be 1");
+  if (typeof value.worker_enabled !== "boolean") {
+    throw new TypeError("config.worker_enabled must be a boolean");
   }
 
-  assertKeys(value.worker, WORKER_KEYS, "config.worker");
-  if (typeof value.worker.enabled !== "boolean") {
-    throw new TypeError("config.worker.enabled must be a boolean");
-  }
-  if (value.worker.modelId !== null
-      && (typeof value.worker.modelId !== "string"
-        || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(value.worker.modelId)
-        || /^(gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,})$/.test(value.worker.modelId))) {
-    throw new TypeError("config.worker.modelId must be null or a model identifier");
+  assertKeys(value.polling_preferences, POLLING_KEYS, "config.polling_preferences");
+  if (value.polling_preferences.mode !== "adaptive") {
+    throw new TypeError('config.polling_preferences.mode must be "adaptive"');
   }
 
-  assertKeys(value.retry, RETRY_KEYS, "config.retry");
-  if (value.retry.maxAutomaticInvocations !== 3) {
-    throw new TypeError("config.retry.maxAutomaticInvocations must be 3");
+  if (value.motion_preference !== null
+      && !ALLOWED_MOTION_PREFERENCES.has(value.motion_preference)) {
+    throw new TypeError('config.motion_preference must be null, "reduced", or "disabled"');
   }
 
-  assertKeys(value.polling, POLLING_KEYS, "config.polling");
-  if (value.polling.strategy !== "adaptive") {
-    throw new TypeError('config.polling.strategy must be "adaptive"');
-  }
-
-  assertKeys(value.motionPreferences, MOTION_KEYS, "config.motionPreferences");
-  if (!Array.isArray(value.motionPreferences.allowed)
-      || value.motionPreferences.allowed.some((preference) => !MOTION_PREFERENCES.has(preference))
-      || new Set(value.motionPreferences.allowed).size !== value.motionPreferences.allowed.length) {
-    throw new TypeError("config.motionPreferences.allowed contains an invalid motion preference");
+  if (!Array.isArray(value.deterministic_check_ids)
+      || value.deterministic_check_ids.length !== DETERMINISTIC_CHECK_IDS.length
+      || value.deterministic_check_ids.some((checkId, index) => (
+        checkId !== DETERMINISTIC_CHECK_IDS[index]
+      ))) {
+    throw new TypeError("config.deterministic_check_ids must exactly match the allowlist");
   }
 
   return value;

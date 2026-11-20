@@ -12,6 +12,7 @@ const trustedPr = {
   number: 12,
   state: "open",
   draft: false,
+  pull_request: {},
   user: { login: "SumukhaK" },
   head: {
     sha: "abc123",
@@ -25,11 +26,11 @@ const passingSteps = [
   { name: "Run Android checks", conclusion: "success" },
 ];
 
-const run = { head_sha: "abc123", conclusion: "success" };
+const run = { head_sha: "abc123", conclusion: "success", actor: { login: "SumukhaK" } };
 
 function classify(overrides = {}) {
   const config = structuredClone(DEFAULT_CONFIG);
-  config.worker.enabled = true;
+  config.worker_enabled = true;
   return classifyWorkflowRun({
     config,
     pr: structuredClone(trustedPr),
@@ -79,6 +80,35 @@ test("blocks setup, runner, timeout, cancellation, missing and unknown outcomes"
       { name: "Run Android checks", conclusion: "action_required" },
     ] }],
   }).decision, "blocked");
+  assert.equal(classify({
+    run: { ...run, conclusion: "failure" },
+    jobs: [{ name: "Unknown CI", conclusion: "failure", steps: [
+      ...passingSteps.slice(0, 2),
+      { name: "Run Android checks", conclusion: "failure" },
+    ] }],
+  }).decision, "blocked");
+  assert.equal(classify({
+    run: { ...run, conclusion: "success" },
+    jobs: [{ conclusion: "success", steps: passingSteps }],
+  }).decision, "blocked");
+  const missingAllowlist = structuredClone(DEFAULT_CONFIG);
+  delete missingAllowlist.deterministic_check_ids;
+  assert.equal(classify({
+    config: missingAllowlist,
+    run: { ...run, conclusion: "failure" },
+    jobs: [{ name: "Android CI", conclusion: "failure", steps: [
+      ...passingSteps.slice(0, 2),
+      { name: "Run Android checks", conclusion: "failure" },
+    ] }],
+  }).decision, "blocked");
+  assert.equal(classify({
+    config: { ...DEFAULT_CONFIG, deterministic_check_ids: ["Unknown CI"] },
+    run: { ...run, conclusion: "failure" },
+    jobs: [{ name: "Unknown CI", conclusion: "failure", steps: [
+      ...passingSteps.slice(0, 2),
+      { name: "Run Android checks", conclusion: "failure" },
+    ] }],
+  }).decision, "blocked");
   assert.equal(classify({ workflowTrusted: false }).decision, "blocked");
 });
 
@@ -94,9 +124,17 @@ test("does not write labels for stale or ineligible PRs", () => {
   assert.equal(classify({ pr: { ...trustedPr, state: "closed" } }).decision, "ineligible");
 });
 
+test("requires the workflow-run actor to match the trusted PR author before label decisions", () => {
+  for (const actor of [{ login: "another-user" }, undefined]) {
+    const result = classify({ run: { ...run, actor } });
+    assert.equal(result.decision, "ineligible");
+    assert.deepEqual(getLabelOperations(result), { add: [], remove: [] });
+  }
+});
+
 test("disabled config never queues failures and the retry budget blocks after three queues", () => {
   const disabled = structuredClone(DEFAULT_CONFIG);
-  disabled.worker.enabled = false;
+  disabled.worker_enabled = false;
   assert.equal(classify({ config: disabled }).decision, "ready");
   const jobs = [{ name: "Android CI", conclusion: "failure", steps: [
     ...passingSteps.slice(0, 2),

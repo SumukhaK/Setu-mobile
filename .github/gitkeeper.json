@@ -1,20 +1,10 @@
 {
-  "schemaVersion": 1,
-  "worker": {
-    "enabled": false,
-    "modelId": null
+  "worker_enabled": false,
+  "polling_preferences": {
+    "mode": "adaptive"
   },
-  "retry": {
-    "maxAutomaticInvocations": 3
-  },
-  "polling": {
-    "strategy": "adaptive"
-  },
-  "motionPreferences": {
-    "allowed": [
-      "system",
-      "reduced",
-      "full"
-    ]
-  }
+  "motion_preference": null,
+  "deterministic_check_ids": [
+    "Android CI"
+  ]
 }

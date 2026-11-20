@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG } from "./config.mjs";
+import { DEFAULT_CONFIG, DETERMINISTIC_CHECK_IDS } from "./config.mjs";
 
 export const LABELS = Object.freeze({
   queued: "gitkeeper/worker-queued",
@@ -11,13 +11,16 @@ const REQUIRED_STEPS = Object.freeze([
   "Set up JDK 17",
   "Run Android checks",
 ]);
+const MAX_AUTOMATIC_INVOCATIONS = 3;
 
 function classifyEligibility(pr, run) {
   if (!pr || !run || !pr.head || pr.head.sha !== run.head_sha) {
     return "stale";
   }
-  if (pr.state !== "open"
-      || pr.draft
+  if (run.actor?.login !== "SumukhaK"
+      || !pr.pull_request
+      || pr.state !== "open"
+      || pr.draft !== false
       || pr.user?.login !== "SumukhaK"
       || pr.head.repo?.full_name !== "SumukhaK/Setu-mobile") {
     return "ineligible";
@@ -29,11 +32,11 @@ function isCompleteOutcome(value) {
   return value === "success" || value === "skipped";
 }
 
-function classifyChecks(run, jobs) {
+function classifyChecks(run, jobs, deterministicCheckIds) {
   if (run.conclusion === "success") {
     const job = jobs.length === 1 ? jobs[0] : null;
     const steps = new Map((job?.steps ?? []).map((step) => [step.name, step.conclusion]));
-    if (job?.name === "Android CI"
+    if (job?.name && deterministicCheckIds.includes(job.name)
         && steps.size === (job.steps ?? []).length
         && job.conclusion === "success"
         && REQUIRED_STEPS.every((name) => steps.get(name) === "success")
@@ -56,7 +59,7 @@ function classifyChecks(run, jobs) {
       ? step.conclusion === "failure"
       : isCompleteOutcome(step.conclusion)
   ));
-  if (job.name === "Android CI"
+  if (job.name && deterministicCheckIds.includes(job.name)
       && steps.size === (job.steps ?? []).length
       && job.conclusion === "failure"
       && gradleFailed
@@ -82,21 +85,27 @@ export function classifyWorkflowRun({
   if (!workflowTrusted) {
     return { decision: "blocked" };
   }
-  const outcome = classifyChecks(run, jobs ?? []);
+  const configuredCheckIds = config?.deterministic_check_ids;
+  const checkIds = Array.isArray(configuredCheckIds)
+      && configuredCheckIds.length === DETERMINISTIC_CHECK_IDS.length
+      && configuredCheckIds.every((checkId, index) => checkId === DETERMINISTIC_CHECK_IDS[index])
+    ? configuredCheckIds
+    : [];
+  const outcome = classifyChecks(run, jobs ?? [], checkIds);
   if (outcome === "ready") {
     return { decision: "ready" };
   }
   if (outcome !== "deterministic-failure") {
     return { decision: "blocked" };
   }
-  if (!config.worker.enabled) {
+  if (!config.worker_enabled) {
     return { decision: "disabled" };
   }
   if (!Number.isInteger(retryCount) || retryCount < 0) {
     return { decision: "blocked" };
   }
   return {
-    decision: retryCount < config.retry.maxAutomaticInvocations ? "queue" : "blocked",
+    decision: retryCount < MAX_AUTOMATIC_INVOCATIONS ? "queue" : "blocked",
   };
 }
 

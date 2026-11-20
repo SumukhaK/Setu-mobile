@@ -2,48 +2,73 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { DEFAULT_CONFIG, parseConfig, validateConfig } from "../scripts/gitkeeper/config.mjs";
 
-test("the default config keeps the worker disabled without selecting a model", () => {
-  assert.equal(DEFAULT_CONFIG.worker.enabled, false);
-  assert.equal(DEFAULT_CONFIG.worker.modelId, null);
-  assert.equal(DEFAULT_CONFIG.retry.maxAutomaticInvocations, 3);
-  assert.equal(DEFAULT_CONFIG.polling.strategy, "adaptive");
-  assert.deepEqual(DEFAULT_CONFIG.motionPreferences.allowed, ["system", "reduced", "full"]);
+test("the default config uses only the approved fields and values", () => {
+  assert.deepEqual(Object.keys(DEFAULT_CONFIG).sort(), [
+    "deterministic_check_ids",
+    "motion_preference",
+    "polling_preferences",
+    "worker_enabled",
+  ]);
+  assert.equal(DEFAULT_CONFIG.worker_enabled, false);
+  assert.deepEqual(DEFAULT_CONFIG.polling_preferences, { mode: "adaptive" });
+  assert.equal(DEFAULT_CONFIG.motion_preference, null);
+  assert.deepEqual(DEFAULT_CONFIG.deterministic_check_ids, ["Android CI"]);
 });
 
-test("validates the complete config shape and rejects unknown keys", () => {
-  assert.deepEqual(validateConfig(structuredClone(DEFAULT_CONFIG)), DEFAULT_CONFIG);
-  assert.throws(() => validateConfig({ ...DEFAULT_CONFIG, command: "echo unsafe" }), /unknown key/i);
-  assert.throws(() => validateConfig({
+test("accepts only the supported worker, polling, motion, and deterministic-check values", () => {
+  for (const worker_enabled of [true, false]) {
+    assert.equal(validateConfig({ ...DEFAULT_CONFIG, worker_enabled }).worker_enabled, worker_enabled);
+  }
+  for (const motion_preference of [null, "reduced", "disabled"]) {
+    assert.equal(validateConfig({ ...DEFAULT_CONFIG, motion_preference }).motion_preference, motion_preference);
+  }
+  assert.deepEqual(validateConfig({
     ...DEFAULT_CONFIG,
-    worker: { ...DEFAULT_CONFIG.worker, permissions: ["write"] },
-  }), /unknown key/i);
+    polling_preferences: { mode: "adaptive" },
+    deterministic_check_ids: ["Android CI"],
+  }), DEFAULT_CONFIG);
 });
 
-test("rejects credentials, permission grants, arbitrary commands, and model fallbacks", () => {
-  for (const unsafeKey of ["token", "credentials", "permissions", "command", "fallbackModelId"]) {
-    assert.throws(() => validateConfig({
-      ...DEFAULT_CONFIG,
-      worker: { ...DEFAULT_CONFIG.worker, [unsafeKey]: "unsafe" },
-    }), /unknown key/i);
+test("rejects all unknown keys, including model IDs, retry config, credentials, permissions, and commands", () => {
+  for (const key of [
+    "modelId",
+    "model_id",
+    "retry",
+    "fallbackModelId",
+    "token",
+    "credentials",
+    "permissions",
+    "command",
+  ]) {
+    assert.throws(() => validateConfig({ ...DEFAULT_CONFIG, [key]: "unsafe" }), /unknown key/i);
   }
   assert.throws(() => validateConfig({
     ...DEFAULT_CONFIG,
-    worker: { ...DEFAULT_CONFIG.worker, modelId: "ghp_abcdefghijklmnopqrstuvwxyz123456" },
-  }), /model identifier/i);
+    polling_preferences: { mode: "adaptive", command: "echo unsafe" },
+  }), /unknown key/i);
 });
 
-test("validates constrained values instead of coercing invalid config", () => {
-  assert.throws(() => validateConfig({
-    ...DEFAULT_CONFIG,
-    worker: { ...DEFAULT_CONFIG.worker, enabled: "true" },
-  }), /enabled/i);
-  assert.throws(() => validateConfig({
-    ...DEFAULT_CONFIG,
-    polling: { strategy: "fixed" },
-  }), /adaptive/i);
-  assert.throws(() => validateConfig({
-    ...DEFAULT_CONFIG,
-    motionPreferences: { allowed: ["execute-command"] },
-  }), /motion/i);
+test("rejects unsupported values and absent or unknown deterministic check IDs", () => {
+  for (const worker_enabled of ["true", 1, null]) {
+    assert.throws(() => validateConfig({ ...DEFAULT_CONFIG, worker_enabled }), /worker_enabled/i);
+  }
+  for (const mode of ["fixed", null, "adaptive "]) {
+    assert.throws(() => validateConfig({
+      ...DEFAULT_CONFIG,
+      polling_preferences: { mode },
+    }), /adaptive/i);
+  }
+  for (const motion_preference of ["system", "full", "execute-command", true]) {
+    assert.throws(() => validateConfig({ ...DEFAULT_CONFIG, motion_preference }), /motion_preference/i);
+  }
+  for (const deterministic_check_ids of [undefined, [], ["Other CI"], ["Android CI", "Other CI"], ["Android CI", "Android CI"]]) {
+    const config = { ...DEFAULT_CONFIG };
+    if (deterministic_check_ids === undefined) {
+      delete config.deterministic_check_ids;
+    } else {
+      config.deterministic_check_ids = deterministic_check_ids;
+    }
+    assert.throws(() => validateConfig(config), /deterministic_check_ids/i);
+  }
   assert.throws(() => parseConfig("{broken"), /JSON/i);
 });

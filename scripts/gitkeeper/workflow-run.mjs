@@ -14,7 +14,7 @@ if (!TOKEN || !EVENT_PATH) {
 
 const apiOrigin = new URL(API_URL).origin;
 
-async function request(path, { method = "GET", body } = {}) {
+async function request(path, { method = "GET", body, allowNotFound = false } = {}) {
   const url = new URL(path, API_URL);
   if (url.origin !== apiOrigin) {
     throw new Error("GitHub API request escaped the configured API origin");
@@ -29,6 +29,9 @@ async function request(path, { method = "GET", body } = {}) {
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
+  if (allowNotFound && response.status === 404) {
+    return null;
+  }
   if (!response.ok) {
     throw new Error(`GitHub API request failed (${response.status}) for ${url.pathname}`);
   }
@@ -81,6 +84,10 @@ if (!run || run.name !== "PR CI" || run.event !== "pull_request" || run.status !
   console.log("Ignoring a non-completed pull_request workflow run.");
   process.exit(0);
 }
+if (run.actor?.login !== "SumukhaK") {
+  console.log("Ignoring a workflow run from an untrusted actor.");
+  process.exit(0);
+}
 if (run.head_repository?.full_name !== EXPECTED_REPOSITORY) {
   console.log("Ignoring an ineligible head repository.");
   process.exit(0);
@@ -108,20 +115,53 @@ if (runPullRequests.length === 0) {
 }
 
 for (const candidate of runPullRequests) {
-  const pullRequest = await request(`/repos/${owner}/${repo}/pulls/${candidate.number}`);
-  const runHeadSha = candidate.head?.sha;
+  if (!Number.isInteger(candidate.number)
+      || typeof candidate.head?.ref !== "string"
+      || typeof candidate.head?.sha !== "string"
+      || typeof candidate.base?.sha !== "string") {
+    continue;
+  }
+
+  const issue = await request(`/repos/${owner}/${repo}/issues/${candidate.number}`);
+  if (!issue?.pull_request) {
+    continue;
+  }
+  const currentHead = await request(
+    `/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(candidate.head.ref)}`,
+    { allowNotFound: true },
+  );
+  const runHeadSha = candidate.head.sha;
+  const pullRequest = {
+    number: issue.number,
+    state: issue.state,
+    draft: issue.draft,
+    pull_request: issue.pull_request,
+    user: issue.user,
+    head: {
+      sha: currentHead?.object?.sha ?? null,
+      repo: { full_name: run.head_repository.full_name },
+    },
+    labels: issue.labels,
+  };
   const eligible = pullRequest.state === "open"
-    && !pullRequest.draft
+    && pullRequest.draft === false
     && pullRequest.user?.login === "SumukhaK"
-    && pullRequest.head?.repo?.full_name === EXPECTED_REPOSITORY
-    && typeof runHeadSha === "string"
-    && pullRequest.head?.sha === runHeadSha;
+    && pullRequest.head.repo.full_name === EXPECTED_REPOSITORY
+    && pullRequest.head.sha === runHeadSha;
   let workflowTrusted = false;
   if (eligible) {
-    const changedFiles = await list(
-      `/repos/${owner}/${repo}/pulls/${pullRequest.number}/files`,
-    );
-    workflowTrusted = !changedFiles.some((file) => file.filename === ".github/workflows/pr-ci.yml");
+    const [baseWorkflow, headWorkflow] = await Promise.all([
+      request(
+        `/repos/${owner}/${repo}/contents/.github/workflows/pr-ci.yml?ref=${encodeURIComponent(candidate.base.sha)}`,
+        { allowNotFound: true },
+      ),
+      request(
+        `/repos/${owner}/${repo}/contents/.github/workflows/pr-ci.yml?ref=${encodeURIComponent(runHeadSha)}`,
+        { allowNotFound: true },
+      ),
+    ]);
+    workflowTrusted = Boolean(baseWorkflow?.sha)
+      && baseWorkflow.sha === headWorkflow?.sha;
   }
   const base = {
     config,
@@ -132,7 +172,7 @@ for (const candidate of runPullRequests) {
   let retryCount;
   if (eligible
       && workflowTrusted
-      && config.worker.enabled
+      && config.worker_enabled
       && run.conclusion === "failure") {
     const events = await list(`/repos/${owner}/${repo}/issues/${pullRequest.number}/timeline`);
     retryCount = countAutomaticInvocations(events);
