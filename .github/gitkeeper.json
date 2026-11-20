@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "worker": {
+    "enabled": false,
+    "modelId": null
+  },
+  "retry": {
+    "maxAutomaticInvocations": 3
+  },
+  "polling": {
+    "strategy": "adaptive"
+  },
+  "motionPreferences": {
+    "allowed": [
+      "system",
+      "reduced",
+      "full"
+    ]
+  }
+}
