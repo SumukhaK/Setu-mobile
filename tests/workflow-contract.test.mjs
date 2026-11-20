@@ -1,8 +1,19 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 const readWorkflow = (name) => readFile(new URL(`../.github/workflows/${name}`, import.meta.url), "utf8");
+
+test("the Gradle wrapper is executable in Git's index", () => {
+  const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
+  const entry = execFileSync("git", ["ls-files", "-s", "--", "gradlew"], {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+  });
+  assert.match(entry.trimEnd(), /^100755 [0-9a-f]{40} 0\tgradlew$/);
+});
 
 test("PR CI is read-only, secret-free, and runs only on PR open/synchronize events", async () => {
   const workflow = await readWorkflow("pr-ci.yml");
