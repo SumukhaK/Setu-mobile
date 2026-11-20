@@ -1,0 +1,10 @@
+{
+  "worker_enabled": false,
+  "polling_preferences": {
+    "mode": "adaptive"
+  },
+  "motion_preference": null,
+  "deterministic_check_ids": [
+    "Android CI"
+  ]
+}

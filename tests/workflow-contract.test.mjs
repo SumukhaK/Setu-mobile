@@ -1,0 +1,54 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+
+const readWorkflow = (name) => readFile(new URL(`../.github/workflows/${name}`, import.meta.url), "utf8");
+
+test("the Gradle wrapper is executable in Git's index", () => {
+  const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
+  const entry = execFileSync("git", ["ls-files", "-s", "--", "gradlew"], {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+  });
+  assert.match(entry.trimEnd(), /^100755 [0-9a-f]{40} 0\tgradlew$/);
+});
+
+test("PR CI is read-only, secret-free, and runs only on PR open/synchronize events", async () => {
+  const workflow = await readWorkflow("pr-ci.yml");
+  assert.match(workflow, /pull_request:\s*\n\s+types:\s*\[opened,\s*synchronize\]/);
+  assert.doesNotMatch(workflow, /^\s+push:/m);
+  assert.doesNotMatch(workflow, /pull_request_target|secrets\./i);
+  assert.match(workflow, /permissions:\s*\n\s+contents:\s+read/);
+  assert.doesNotMatch(workflow, /:\s*(write|admin)\b/i);
+  assert.equal((workflow.match(/\.\/gradlew testDebugUnitTest detekt lint/g) ?? []).length, 1);
+});
+
+test("the privileged workflow is default-branch workflow_run only and never consumes PR artifacts", async () => {
+  const workflow = await readWorkflow("gitkeeper-state.yml");
+  assert.match(workflow, /workflow_run:/);
+  assert.match(workflow, /branches:\s*\[main\]/);
+  assert.doesNotMatch(workflow, /pull_request_target|download-artifact|actions\/download-artifact/i);
+  assert.doesNotMatch(workflow, /pull_request:\s*\n/);
+  assert.match(workflow, /ref:\s*\$\{\{\s*github\.event\.repository\.default_branch\s*\}\}/);
+  assert.match(workflow, /workflow-run\.mjs/);
+  assert.match(workflow, /permissions:\r?\n  actions: read\r?\n  contents: read\r?\n  issues: write\r?\n\r?\n/);
+  assert.doesNotMatch(workflow, /pull-requests:/);
+});
+
+test("the state workflow reads config and metadata through API without running PR content", async () => {
+  const script = await readFile(new URL("../scripts/gitkeeper/workflow-run.mjs", import.meta.url), "utf8");
+  assert.match(script, /\.github\/gitkeeper\.json/);
+  assert.match(script, /api\.github\.com/);
+  assert.match(script, /run\.actor\?\.login !== "SumukhaK"/);
+  assert.match(script, /\/issues\/\$\{candidate\.number\}/);
+  assert.doesNotMatch(script, /\/repos\/\$\{owner\}\/\$\{repo\}\/pulls\//);
+  assert.ok(
+    script.indexOf('if (run.actor?.login !== "SumukhaK")')
+      < script.indexOf("await writeLabels"),
+    "workflow-run actor is checked before label writes",
+  );
+  assert.doesNotMatch(script, /execSync|spawnSync|child_process/);
+  assert.doesNotMatch(script, /actions\/download-artifact|artifact/i);
+});
